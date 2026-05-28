@@ -1,0 +1,1409 @@
+<!--
+  PDF Splitter — Cortador de PDF por Páginas
+
+  MIT License
+  Copyright (c) 2025 ElMemoRexx
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+
+  https://github.com/ElMemoRexx/pdf-splitter
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Splitter — Cortador de PDF por Páginas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+/* ── VARIABLES GLOBALES ── */
+:root {
+  --primary:#6D0F2A; --primary-h:#8B1535; --accent:#C4980A;
+  --ok:#1E7E4A; --warn:#B45309; --err:#B91C1C;
+  --bg:#F5F6F8; --card:#FFFFFF; --border:#DDE1E7;
+  --text:#1A1A2E; --muted:#6B7280;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── ANIMACIONES ── */
+@keyframes fadeUp   { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn   { from{opacity:0} to{opacity:1} }
+@keyframes scaleIn  { from{opacity:0;transform:scale(.85)} to{opacity:1;transform:scale(1)} }
+@keyframes slideDown{ from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes pulse    { 0%,100%{box-shadow:0 0 0 0 rgba(109,15,42,.35)} 50%{box-shadow:0 0 0 8px rgba(109,15,42,0)} }
+@keyframes spin     { to{transform:rotate(360deg)} }
+@keyframes bounce   { 0%,100%{transform:scale(1)} 40%{transform:scale(1.25)} 70%{transform:scale(.9)} }
+@keyframes ripple   { to{transform:scale(4);opacity:0} }
+@keyframes checkDraw{ from{stroke-dashoffset:60} to{stroke-dashoffset:0} }
+@keyframes confettiFall {
+  0%  {transform:translateY(-20px) rotate(0deg);  opacity:1}
+  100%{transform:translateY(200px) rotate(720deg);opacity:0}
+}
+
+/* ── CABECERA ── */
+header{
+  background:var(--primary);color:#fff;padding:12px 24px;
+  display:flex;align-items:center;gap:16px;
+  box-shadow:0 2px 10px rgba(0,0,0,.35);
+  position:sticky;top:0;z-index:10;
+  animation:fadeIn .5s ease both;
+}
+.header-logo-wrap{
+  display:flex;align-items:center;gap:10px;flex-shrink:0;
+  background:rgba(255,255,255,.97);padding:6px 12px;border-radius:8px;
+}
+.header-logo-svg{width:38px;height:38px;flex-shrink:0}
+.header-title{flex:1;text-align:center}
+header h1{font-size:17px;font-weight:700;line-height:1.2}
+header p {font-size:11px;opacity:.75;margin-top:2px}
+.badge{
+  background:var(--accent);color:#fff;font-size:10px;font-weight:800;
+  padding:3px 9px;border-radius:99px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;
+  flex-shrink:0;
+}
+
+/* ── BARRA DE PROGRESO (RAIL) ── */
+.rail{
+  display:flex;align-items:center;padding:18px 28px 0;
+  max-width:960px;margin:0 auto;
+  animation:fadeIn .6s ease .2s both;
+}
+.rail-step{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:60px}
+.rail-dot{
+  width:30px;height:30px;border-radius:50%;
+  background:var(--border);color:var(--muted);
+  font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .4s,color .4s,transform .3s;
+}
+.rail-dot.active{background:var(--primary);color:#fff;animation:pulse 1.8s infinite}
+.rail-dot.done  {background:var(--ok);color:#fff;transform:scale(1.1)}
+.rail-label{font-size:10px;color:var(--muted);font-weight:600;text-align:center}
+.rail-line{flex:1;height:3px;background:var(--border);border-radius:2px;margin-bottom:14px;transition:background .5s}
+.rail-line.done{background:var(--ok)}
+
+/* ── TARJETAS (CARDS) ── */
+main{max-width:960px;margin:20px auto;padding:0 16px 60px;display:flex;flex-direction:column;gap:18px}
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:24px;box-shadow:0 1px 5px rgba(0,0,0,.05);
+  transition:opacity .4s,filter .4s,box-shadow .3s;
+  animation:fadeUp .5s ease both;
+}
+.card:nth-child(1){animation-delay:.05s}
+.card:nth-child(2){animation-delay:.15s}
+.card:nth-child(3){animation-delay:.25s}
+.card:nth-child(4){animation-delay:.35s}
+/* Las tarjetas bloqueadas no son interactivas hasta completar el paso previo */
+.card.locked{opacity:.45;filter:grayscale(.2);pointer-events:none}
+.card:hover:not(.locked){box-shadow:0 4px 16px rgba(0,0,0,.09)}
+
+.card-head{
+  display:flex;align-items:flex-start;gap:14px;
+  padding-bottom:18px;margin-bottom:20px;
+  border-bottom:1px solid var(--border);
+}
+.step-circle{
+  width:34px;height:34px;border-radius:50%;
+  background:var(--primary);color:#fff;
+  font-weight:800;font-size:15px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.card-head h2{font-size:15px;font-weight:700;color:var(--primary)}
+.card-head p {font-size:12px;color:var(--muted);margin-top:3px}
+
+/* ── FORMULARIO ── */
+.form-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.form-group{flex:1;min-width:200px}
+.form-group label{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
+.field-wrap{position:relative}
+.field-wrap input{
+  width:100%;padding:10px 36px 10px 12px;
+  border:1px solid var(--border);border-radius:8px;
+  font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s;
+}
+.field-wrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(109,15,42,.12)}
+.field-icon{
+  position:absolute;right:10px;top:50%;transform:translateY(-50%);
+  font-size:15px;pointer-events:none;opacity:.4;
+}
+.optional-badge{
+  display:inline-block;font-size:10px;font-weight:700;
+  background:#F1F3F6;color:var(--muted);padding:1px 6px;
+  border-radius:4px;margin-left:5px;text-transform:uppercase;letter-spacing:.3px;
+}
+.form-hint{font-size:11px;color:var(--muted);margin-top:5px;margin-bottom:16px}
+
+/* ── TÍTULO DE SECCIÓN ── */
+.sec-title{
+  font-size:11px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.6px;color:var(--muted);margin:20px 0 10px;
+}
+
+/* ── DOCUMENTOS CONDICIONALES ── */
+.cond-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.cond-item{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;
+  cursor:pointer;transition:border-color .25s,background .25s,transform .2s,box-shadow .2s;
+  position:relative;
+}
+.cond-item:hover{border-color:var(--primary);background:#fdf4f7;transform:translateY(-1px);box-shadow:0 3px 10px rgba(109,15,42,.1)}
+.cond-item.checked{border-color:var(--primary);background:#fdf4f7;box-shadow:0 2px 8px rgba(109,15,42,.15)}
+.cond-item input[type="checkbox"]{accent-color:var(--primary);margin-top:3px;flex-shrink:0;width:16px;height:16px}
+.cond-name{font-size:13px;font-weight:700}
+.cond-desc{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+
+/* ── TOOLTIP ── */
+.tip-icon{
+  position:absolute;top:10px;right:10px;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--border);color:var(--muted);
+  font-size:10px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;
+  cursor:help;
+}
+/* El tooltip se construye en CSS puro con ::after para no requerir JS */
+.tip-icon::after{
+  content:attr(data-tip);
+  position:absolute;bottom:calc(100% + 6px);right:0;
+  background:#1A1A2E;color:#fff;font-size:11px;font-weight:400;
+  padding:7px 10px;border-radius:7px;width:200px;line-height:1.4;
+  white-space:normal;pointer-events:none;
+  opacity:0;transform:translateY(4px);transition:opacity .2s,transform .2s;
+  z-index:100;
+}
+.tip-icon:hover::after{opacity:1;transform:translateY(0)}
+
+/* ── PÁGINAS VARIABLES ── */
+.var-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.var-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px;transition:border-color .2s}
+.var-card .vc-label{font-size:13px;font-weight:700}
+.var-card .vc-desc {font-size:11px;color:var(--muted);margin:3px 0 12px}
+.stepper{display:flex;align-items:center;gap:10px}
+.step-btn{
+  width:30px;height:30px;border-radius:7px;
+  border:1.5px solid var(--border);background:#fff;cursor:pointer;
+  font-size:18px;font-weight:700;color:var(--primary);
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s,border-color .15s,transform .15s;
+}
+.step-btn:hover:not(:disabled){background:#fdf4f7;border-color:var(--primary)}
+.step-btn:active:not(:disabled){animation:bounce .35s ease}
+.step-btn:disabled{opacity:.3;cursor:not-allowed}
+.step-val{font-size:26px;font-weight:800;color:var(--primary);min-width:38px;text-align:center;transition:transform .15s}
+.step-range{font-size:11px;color:var(--muted)}
+
+.total-row{
+  margin-top:20px;padding:14px 18px;
+  background:#F8F9FA;border-radius:10px;
+  display:flex;justify-content:space-between;align-items:center;
+  transition:background .3s;
+}
+.total-row .tl{font-size:13px;color:var(--muted)}
+.total-row .tv{font-size:26px;font-weight:800;color:var(--primary);transition:color .3s}
+
+/* ── ZONA DE CARGA DE ARCHIVOS ── */
+.upload-zone{
+  border:2px dashed var(--border);border-radius:12px;
+  padding:36px 24px;text-align:center;cursor:pointer;
+  transition:border-color .2s,background .2s,transform .2s;
+  position:relative;
+}
+.upload-zone:hover,.upload-zone.drag{
+  border-color:var(--primary);background:#fdf4f7;transform:scale(1.01);
+}
+.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.upload-icon{font-size:44px;margin-bottom:10px;transition:transform .3s}
+.upload-zone:hover .upload-icon{transform:scale(1.1)}
+.upload-zone h3{font-size:15px;font-weight:700;color:var(--primary)}
+.upload-zone p {font-size:12px;color:var(--muted);margin-top:4px}
+.upload-zone.loaded{border-style:solid;border-color:var(--ok);background:#F0FAF4;animation:scaleIn .4s ease}
+
+.pages-row{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+.pbox{
+  flex:1;min-width:110px;border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;text-align:center;
+  transition:border-color .4s,background .4s;
+}
+.pbox .pv{font-size:28px;font-weight:800;transition:color .4s}
+.pbox .pl{font-size:10px;text-transform:uppercase;font-weight:700;color:var(--muted);margin-top:2px}
+.pbox.ok {border-color:var(--ok); background:#F0FAF4} .pbox.ok  .pv{color:var(--ok)}
+.pbox.bad{border-color:var(--err);background:#FEF2F2} .pbox.bad .pv{color:var(--err)}
+.pbox.info .pv{color:var(--primary)}
+
+/* ── ALERTAS ── */
+.alert{
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 16px;border-radius:9px;font-size:13px;
+  margin-top:12px;line-height:1.5;
+  animation:slideDown .3s ease both;
+}
+.alert.ok  {background:#F0FAF4;border:1px solid #6EE7A0;color:#1A5C34}
+.alert.warn{background:#FFFBEB;border:1px solid #FCD34D;color:#78350F}
+.alert.err {background:#FEF2F2;border:1px solid #FCA5A5;color:#7F1D1D}
+.alert-icon{flex-shrink:0;font-size:16px;margin-top:1px}
+
+/* ── TABLA DE DOCUMENTOS ── */
+.doc-table{width:100%;border-collapse:collapse;font-size:12px}
+.doc-table thead th{
+  background:#F1F3F6;padding:9px 12px;text-align:left;
+  font-size:10px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--muted);border-bottom:2px solid var(--border);
+}
+.doc-table tbody td{padding:9px 12px;border-bottom:1px solid #F0F2F5;vertical-align:middle}
+.doc-table tbody tr{transition:background .15s;animation:fadeIn .25s ease both}
+.doc-table tbody tr:hover td{background:#FAFBFC}
+.doc-table tbody tr:last-child td{border-bottom:none}
+.seq-dot{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%;
+  background:var(--primary);color:#fff;font-size:10px;font-weight:800;
+}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.3px}
+.tag.fijo       {background:#EEF2FF;color:#3730A3}
+.tag.variable   {background:#FFF8E1;color:#92400E}
+.tag.condicional{background:#ECFDF5;color:#065F46}
+.range-chip{font-family:'Consolas',monospace;font-size:11px;font-weight:700;color:var(--primary);background:#FDF4F7;padding:3px 8px;border-radius:5px}
+.range-chip.bad {color:var(--err);background:#FEF2F2}
+.fname{font-family:'Consolas',monospace;font-size:10px;color:var(--muted)}
+
+/* ── BOTÓN DE ACCIÓN PRINCIPAL ── */
+.action-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.btn-main{
+  background:var(--primary);color:#fff;
+  border:none;padding:13px 28px;border-radius:10px;
+  font-size:14px;font-weight:700;cursor:pointer;
+  display:inline-flex;align-items:center;gap:10px;
+  transition:background .2s,transform .1s,box-shadow .2s;
+  position:relative;overflow:hidden;
+}
+.btn-main:hover:not(:disabled){background:var(--primary-h);box-shadow:0 4px 14px rgba(109,15,42,.4)}
+.btn-main:active:not(:disabled){transform:scale(.97)}
+.btn-main:disabled{background:#9CA3AF;cursor:not-allowed;box-shadow:none}
+/* El efecto ripple se crea dinámicamente en JS al hacer clic */
+.btn-main .ripple{
+  position:absolute;border-radius:50%;
+  background:rgba(255,255,255,.35);
+  width:10px;height:10px;transform:scale(0);
+  animation:ripple .6s linear;
+  pointer-events:none;
+}
+.status-msg{font-size:12px;color:var(--muted)}
+
+/* ── BARRA DE PROGRESO ── */
+.progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:14px}
+.progress-bar{height:100%;background:var(--primary);width:0%;transition:width .3s ease;border-radius:3px}
+.progress-label{font-size:11px;color:var(--muted);margin-top:6px;min-height:16px;transition:opacity .2s}
+
+.hidden{display:none!important}
+.spin{display:inline-block;width:18px;height:18px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+
+/* ── CAJA DE ÉXITO ── */
+.success-box{
+  margin-top:16px;padding:20px 24px;
+  background:#F0FAF4;border:1px solid #6EE7A0;border-radius:12px;
+  display:flex;align-items:center;gap:20px;
+  animation:scaleIn .4s ease both;
+}
+.check-circle{
+  width:52px;height:52px;border-radius:50%;
+  background:var(--ok);flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.check-circle svg{width:28px;height:28px}
+.check-circle svg path{
+  stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:60;stroke-dashoffset:60;
+  animation:checkDraw .4s ease .2s forwards;
+}
+.success-text h3{font-size:15px;font-weight:700;color:var(--ok)}
+.success-text p {font-size:13px;color:#1A5C34;margin-top:4px}
+.success-text code{background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:12px}
+
+/* ── CONFETTI ── */
+.confetti-wrap{position:relative;overflow:hidden;border-radius:12px}
+.confetti-dot{
+  position:absolute;top:-10px;width:8px;height:8px;border-radius:2px;
+  animation:confettiFall 1.2s ease forwards;
+  pointer-events:none;
+}
+
+/* ── PIE DE PÁGINA Y RESPONSIVE ── */
+footer{text-align:center;color:var(--muted);font-size:11px;padding:20px}
+@media(max-width:600px){
+  header{padding:10px 14px}
+  main{padding:0 10px 40px}
+  .card{padding:18px 14px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ CABECERA ══ -->
+<header>
+  <div class="header-logo-wrap">
+    <!-- Ícono SVG generado en código — no requiere imagen externa -->
+    <svg class="header-logo-svg" viewBox="0 0 38 38" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PDF Splitter">
+      <rect x="3" y="2" width="22" height="28" rx="2.5" fill="white" stroke="#6D0F2A" stroke-width="1.6"/>
+      <rect x="3" y="2" width="22" height="8" rx="2.5" fill="#6D0F2A"/>
+      <text x="14" y="9" text-anchor="middle" fill="white" font-size="5.5" font-weight="800" font-family="Arial,sans-serif">PDF</text>
+      <line x1="7" y1="17" x2="21" y2="17" stroke="#6D0F2A" stroke-width="1.1" opacity="0.35"/>
+      <line x1="7" y1="21" x2="21" y2="21" stroke="#6D0F2A" stroke-width="1.1" opacity="0.35"/>
+      <line x1="7" y1="25" x2="15" y2="25" stroke="#6D0F2A" stroke-width="1.1" opacity="0.35"/>
+      <circle cx="31" cy="30" r="5" fill="white" stroke="#C4980A" stroke-width="1.6"/>
+      <circle cx="31" cy="20" r="5" fill="white" stroke="#C4980A" stroke-width="1.6"/>
+      <line x1="27.5" y1="25.8" x2="37" y2="14" stroke="#C4980A" stroke-width="1.6" stroke-linecap="round"/>
+      <line x1="27.5" y1="24.2" x2="37" y2="36" stroke="#C4980A" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="header-title">
+    <h1>✂️ PDF Splitter — Cortador de PDF por Páginas</h1>
+    <p>Divide un PDF en documentos individuales según tu catálogo configurable</p>
+  </div>
+  <span class="badge">v1.4.0</span>
+</header>
+
+<!-- ══ BARRA DE PROGRESO ══ -->
+<div class="rail" id="railWrap">
+  <div class="rail-step"><div class="rail-dot active" id="rd1">1</div><div class="rail-label">Configurar</div></div>
+  <div class="rail-line" id="rl1"></div>
+  <div class="rail-step"><div class="rail-dot" id="rd2">2</div><div class="rail-label">Cargar PDF</div></div>
+  <div class="rail-line" id="rl2"></div>
+  <div class="rail-step"><div class="rail-dot" id="rd3">3</div><div class="rail-label">Verificar</div></div>
+  <div class="rail-line" id="rl3"></div>
+  <div class="rail-step"><div class="rail-dot" id="rd4">4</div><div class="rail-label">Generar</div></div>
+</div>
+
+<main>
+
+<!-- ══ PASO 1: CONFIGURACIÓN ══ -->
+<div class="card" id="card1">
+  <div class="card-head">
+    <div class="step-circle">1</div>
+    <div>
+      <h2>Configuración del Expediente</h2>
+      <p>Configura los documentos que aplican. Los identificadores son opcionales.</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Folio / Número de Caso <span class="optional-badge">Opcional</span></label>
+      <div class="field-wrap">
+        <input type="text" id="numExpediente" placeholder="Ej. EXP-2025-001" maxlength="20" autocomplete="off" spellcheck="false"/>
+        <span class="field-icon">🔢</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Nombre del Titular <span class="optional-badge">Opcional</span></label>
+      <div class="field-wrap">
+        <input type="text" id="nombreTitular" placeholder="Ej. Juan García López" maxlength="60" autocomplete="off" spellcheck="false"/>
+        <span class="field-icon">👤</span>
+      </div>
+    </div>
+  </div>
+  <p class="form-hint">Si se proporcionan, se usarán como identificador en los nombres de los archivos y del ZIP.</p>
+
+  <div class="sec-title">📋 Documentos Condicionales — Marcar los que aplican</div>
+  <div class="cond-grid">
+    <div class="cond-item" id="lbl_docAdicionalA">
+      <input type="checkbox" id="cond_docAdicionalA"/>
+      <div>
+        <div class="cond-name">Documento Adicional A</div>
+        <div class="cond-desc">Incluir si aplica el supuesto A del expediente</div>
+      </div>
+      <span class="tip-icon" data-tip="Marcar únicamente si este documento fue solicitado para el caso específico.">?</span>
+    </div>
+    <div class="cond-item" id="lbl_docEspecialB">
+      <input type="checkbox" id="cond_docEspecialB"/>
+      <div>
+        <div class="cond-name">Documento Especial B</div>
+        <div class="cond-desc">Incluir si aplica el supuesto B del expediente</div>
+      </div>
+      <span class="tip-icon" data-tip="Marcar únicamente si este documento adicional fue requerido para el caso.">?</span>
+    </div>
+  </div>
+
+  <div class="sec-title">📄 Documentos con Páginas Variables — Ajustar según el expediente</div>
+  <div class="var-grid">
+    <div class="var-card">
+      <div class="vc-label">Contrato Principal</div>
+      <div class="vc-desc">El contrato puede variar entre 10 y 12 páginas según el tipo de acuerdo</div>
+      <div class="stepper">
+        <button type="button" class="step-btn" id="btn_contrato_minus">−</button>
+        <div class="step-val" id="val_contrato">10</div>
+        <button type="button" class="step-btn" id="btn_contrato_plus">+</button>
+        <span class="step-range">mín 10 / máx 12</span>
+      </div>
+    </div>
+    <div class="var-card">
+      <div class="vc-label">Anexo Técnico</div>
+      <div class="vc-desc">El anexo varía entre 1 y 3 páginas según el nivel de detalle del proyecto</div>
+      <div class="stepper">
+        <button type="button" class="step-btn" id="btn_anexo_minus">−</button>
+        <div class="step-val" id="val_anexo">1</div>
+        <button type="button" class="step-btn" id="btn_anexo_plus">+</button>
+        <span class="step-range">mín 1 / máx 3</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="total-row">
+    <span class="tl">Total de páginas esperadas en el PDF:</span>
+    <span class="tv" id="totalEsp">—</span>
+  </div>
+</div>
+
+<!-- ══ PASO 2: CARGAR PDF ══ -->
+<div class="card locked" id="card2">
+  <div class="card-head">
+    <div class="step-circle">2</div>
+    <div>
+      <h2>Cargar PDF</h2>
+      <p>Selecciona el archivo con todos los documentos en orden. El procesamiento es 100% local.</p>
+    </div>
+  </div>
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="pdfInput" accept=".pdf"/>
+    <div class="upload-icon">📄</div>
+    <h3>Haz clic aquí o arrastra el PDF</h3>
+    <p>Solo archivos .pdf</p>
+  </div>
+  <div class="pages-row hidden" id="pagesRow">
+    <div class="pbox info" id="boxLoaded">  <div class="pv" id="valLoaded">—</div>  <div class="pl">Páginas en el PDF</div></div>
+    <div class="pbox info" id="boxExpected"><div class="pv" id="valExpected">—</div><div class="pl">Páginas esperadas</div></div>
+    <div class="pbox info" id="boxDiff">    <div class="pv" id="valDiff">—</div>    <div class="pl">Diferencia</div></div>
+  </div>
+  <div id="pagesAlert"></div>
+</div>
+
+<!-- ══ PASO 3: VERIFICAR ══ -->
+<div class="card locked" id="card3">
+  <div class="card-head">
+    <div class="step-circle">3</div>
+    <div>
+      <h2>Vista Previa de Asignación de Páginas</h2>
+      <p>Verifica que cada documento corresponda al rango correcto antes de cortar.</p>
+    </div>
+  </div>
+  <div id="tableContainer">
+    <p style="color:var(--muted);font-size:13px">Carga el PDF para ver la asignación de páginas.</p>
+  </div>
+</div>
+
+<!-- ══ PASO 4: GENERAR ══ -->
+<div class="card locked" id="card4">
+  <div class="card-head">
+    <div class="step-circle">4</div>
+    <div>
+      <h2>Generar y Descargar Documentos</h2>
+      <p>Se descargará un archivo ZIP con todos los PDFs nombrados individualmente.</p>
+    </div>
+  </div>
+  <div class="action-row">
+    <button type="button" class="btn-main" id="btnCut" disabled>
+      <span id="btnIcon">✂️</span>
+      <span id="btnText">Cortar y Descargar ZIP</span>
+    </button>
+    <span class="status-msg" id="statusMsg">Completa los pasos anteriores para continuar.</span>
+  </div>
+  <div class="progress hidden" id="progressWrap">
+    <div class="progress-bar" id="progressBar"></div>
+  </div>
+  <div class="progress-label hidden" id="progressLabel"></div>
+  <div id="cutResult"></div>
+</div>
+
+</main>
+
+<footer>
+  PDF Splitter &nbsp;·&nbsp; Procesamiento 100% local — ningún archivo se envía a ningún servidor
+  &nbsp;·&nbsp; <a href="https://github.com/ElMemoRexx/pdf-splitter" target="_blank" rel="noopener" style="color:inherit">MIT License · github.com/ElMemoRexx</a>
+</footer>
+
+<script>
+"use strict";
+
+/**
+ * @fileoverview PDF Splitter — Cortador de PDF por Páginas
+ *
+ * @description Herramienta web autocontenida (single-file) que divide un PDF compuesto
+ *   en múltiples documentos individuales según un catálogo configurable.
+ *   Funciona 100% en el navegador — ningún dato sale del dispositivo del usuario.
+ *
+ *   Flujo de trabajo:
+ *     1. El usuario configura el catálogo (condicionales y páginas variables).
+ *     2. Carga un PDF con todos los documentos combinados en orden.
+ *     3. La app verifica que el conteo de páginas coincida con la configuración.
+ *     4. Divide el PDF en paralelo y descarga un ZIP con los archivos nombrados.
+ *
+ * @author      ElMemoRexx <https://github.com/ElMemoRexx>
+ * @version     1.4.0
+ * @license     MIT
+ * @date        2025
+ * @repository  https://github.com/ElMemoRexx/pdf-splitter
+ *
+ * @requires pdf-lib 1.17.1 (MIT) — manipulación de PDFs en el navegador
+ * @requires JSZip  3.10.1  (MIT) — creación de archivos ZIP en el navegador
+ */
+
+// ══════════════════════════════════════════════════
+// UTILIDADES GENERALES
+// ══════════════════════════════════════════════════
+
+/**
+ * Acceso abreviado a document.getElementById.
+ * @param   {string} id - ID del elemento en el DOM
+ * @returns {HTMLElement|null} El elemento encontrado, o null
+ * @example el("btnCut").disabled = true;
+ */
+const el = id => document.getElementById(id);
+
+/**
+ * Escapa caracteres HTML especiales para prevenir inyección XSS.
+ * Usa textContent internamente para que el navegador haga la conversión,
+ * evitando listas de caracteres manuales que pueden quedar incompletas.
+ *
+ * @param   {*}      str - Valor a escapar (se convierte a string)
+ * @returns {string} Cadena segura para insertar en innerHTML
+ * @example
+ *   escapeHtml('<b>hola</b>')  // → '&lt;b&gt;hola&lt;/b&gt;'
+ */
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = String(str);
+  return d.innerHTML;
+}
+
+/**
+ * Crea una versión "debounced" de una función: retrasa su ejecución
+ * hasta que transcurran `ms` milisegundos sin nuevas llamadas.
+ * Útil para evitar recálculos en cada pulsación de tecla.
+ *
+ * @param   {Function} fn - Función a envolver
+ * @param   {number}   ms - Milisegundos de espera
+ * @returns {Function} Nueva función con debounce aplicado
+ * @example
+ *   const guardar = debounce(() => api.save(), 300);
+ *   input.addEventListener('input', guardar); // solo guarda al dejar de escribir
+ */
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+// ══════════════════════════════════════════════════
+// CATÁLOGO DE DOCUMENTOS
+//
+// Define la estructura del expediente: qué documentos lo componen,
+// cuántas páginas ocupa cada uno y si su inclusión es fija,
+// variable (rango) o condicional (depende de un checkbox).
+//
+// Para personalizar la herramienta, modifica este array.
+// El orden aquí determina el orden de corte en el PDF.
+//
+// Esquema de cada entrada:
+//   id:      {string}  Identificador interno único (no se muestra al usuario)
+//   nombre:  {string}  Nombre base del archivo PDF resultante (sin extensión ni secuencia)
+//   label:   {string}  Etiqueta legible en la interfaz y la tabla
+//   pg:      {number}  Páginas predeterminadas del documento
+//   tipo:    {string}  "fijo" | "variable" | "condicional"
+//   cond?:   {string}  (solo condicional) Clave correspondiente en S.conds
+//   varKey?: {string}  (solo variable)   Clave correspondiente en S.varPg
+//   min?:    {number}  (solo variable)   Mínimo de páginas permitido
+//   max?:    {number}  (solo variable)   Máximo de páginas permitido
+// ══════════════════════════════════════════════════
+const CATALOG = [
+  // ── Documentos de páginas fijas ──────────────────────────────────────
+  { id: "solicitud",     nombre: "Documento_Solicitud",           label: "Solicitud Principal",          pg: 2, tipo: "fijo" },
+  { id: "identificacion",nombre: "Documento_Identificacion",      label: "Identificación Oficial",        pg: 1, tipo: "fijo" },
+  { id: "comprobante",   nombre: "Documento_Comprobante",         label: "Comprobante de Domicilio",      pg: 1, tipo: "fijo" },
+  { id: "formulario_a",  nombre: "Documento_Formulario_A",        label: "Formulario A",                  pg: 2, tipo: "fijo" },
+  { id: "declaracion",   nombre: "Documento_Declaracion",         label: "Declaración Jurada",            pg: 1, tipo: "fijo" },
+  // ── Documentos de páginas variables (el usuario ajusta el conteo) ─────
+  { id: "contrato",      nombre: "Documento_Contrato",            label: "Contrato Principal",            pg: 10, tipo: "variable",    varKey: "contrato", min: 10, max: 12 },
+  { id: "anexo",         nombre: "Documento_Anexo",               label: "Anexo Técnico",                 pg: 1,  tipo: "variable",    varKey: "anexo",    min: 1,  max: 3  },
+  // ── Documentos condicionales (se incluyen solo si están marcados) ──────
+  { id: "doc_adicional", nombre: "Documento_Adicional_A",         label: "Documento Adicional A",         pg: 1, tipo: "condicional", cond: "docAdicionalA" },
+  { id: "doc_especial",  nombre: "Documento_Especial_B",          label: "Documento Especial B",          pg: 2, tipo: "condicional", cond: "docEspecialB"  },
+];
+
+// ══════════════════════════════════════════════════
+// ESTADO DE LA APLICACIÓN
+//
+// Fuente única de verdad para toda la interfaz.
+// Toda actualización de UI parte de aquí; el DOM refleja este estado,
+// nunca al revés (excepto en los handlers de eventos específicos).
+//
+// Propiedades:
+//   numExpediente {string}          Folio o número de caso (opcional; se usa en nombres de archivo)
+//   nombreTitular {string}          Nombre del titular   (opcional; se usa en nombres de archivo)
+//   conds         {Object<boolean>} Estado de cada documento condicional (true = incluir en el corte)
+//     .docAdicionalA {boolean}      Incluir Documento Adicional A
+//     .docEspecialB  {boolean}      Incluir Documento Especial B
+//   varPg         {Object<number>}  Número actual de páginas para documentos variables
+//     .contrato  {number}           Páginas del Contrato Principal (rango 10–12)
+//     .anexo     {number}           Páginas del Anexo Técnico     (rango 1–3)
+//   pdfBytes  {Uint8Array|null}     Bytes del PDF cargado (reservado para posibles extensiones futuras)
+//   pdfDoc    {PDFDocument|null}    Instancia de pdf-lib cacheada — evita re-parsear en cada corte
+//   pdfPages  {number}             Número de páginas del PDF actual (0 si no hay PDF cargado)
+// ══════════════════════════════════════════════════
+const S = {
+  numExpediente: "",
+  nombreTitular: "",
+  conds: { docAdicionalA: false, docEspecialB: false },
+  varPg: { contrato: 10, anexo: 1 },
+  pdfBytes: null,
+  pdfDoc:   null,
+  pdfPages: 0,
+};
+
+// ══════════════════════════════════════════════════
+// CACHÉ DE CÓMPUTO
+// ══════════════════════════════════════════════════
+
+/** @type {{docs: Array, ranges: Array, total: number}|null} Caché del resultado de computed() */
+let _cache = null;
+
+/**
+ * Invalida la caché de cómputo.
+ * Se llama siempre que S cambia (toggle de condicional, cambio de páginas variable, etc.)
+ * para forzar un recálculo en el próximo ciclo de render.
+ * @returns {void}
+ */
+function invalidate() { _cache = null; }
+
+/**
+ * Calcula (o devuelve de caché) el estado derivado del catálogo y el estado actual.
+ * Filtra condicionales según S.conds, asigna secuencias y rangos de páginas.
+ * La caché evita recálculos redundantes dentro del mismo ciclo de update.
+ *
+ * @returns {{
+ *   docs:   Array<Object>,  Lista de documentos activos con pg y seq asignados
+ *   ranges: Array<Object>,  Igual que docs pero con start y end de página calculados
+ *   total:  number          Total de páginas esperadas en el PDF
+ * }}
+ * @example
+ *   const { total, ranges } = computed();
+ *   console.log(`Esperadas: ${total} páginas, ${ranges.length} documentos`);
+ */
+function computed() {
+  if (_cache) return _cache;
+
+  const docs = CATALOG
+    .filter(d => d.tipo !== "condicional" || S.conds[d.cond])
+    .map((d, i) => ({
+      ...d,
+      // Para variables, usa el conteo actual del usuario; para fijos, el del catálogo
+      pg:  d.tipo === "variable" ? S.varPg[d.varKey] : d.pg,
+      seq: String(i + 1).padStart(2, "0"),
+    }));
+
+  let p = 1;
+  const ranges = docs.map(d => {
+    const start = p, end = p + d.pg - 1;
+    p = end + 1;
+    return { ...d, start, end };
+  });
+
+  const total = docs.reduce((s, d) => s + d.pg, 0);
+  _cache = { docs, ranges, total };
+  return _cache;
+}
+
+// ══════════════════════════════════════════════════
+// IDENTIFICADOR DE EXPEDIENTE
+// ══════════════════════════════════════════════════
+
+/**
+ * Construye el sufijo de identificación para los nombres de archivo.
+ * Combina folio y nombre del titular, sanitizando caracteres especiales
+ * para que el resultado sea un nombre de archivo válido en cualquier sistema operativo.
+ *
+ * @returns {string} Identificador sanitizado (cadena vacía si no hay datos)
+ * @example
+ *   // S.numExpediente = "EXP-001", S.nombreTitular = "Juan García"
+ *   buildId() // → "EXP-001_Juan_García"
+ */
+function buildId() {
+  const parts = [];
+  if (S.numExpediente) parts.push(S.numExpediente);
+  if (S.nombreTitular) parts.push(
+    S.nombreTitular.trim()
+      .replace(/\s+/g, "_")
+      // Conservar letras, números, guiones y caracteres del español; eliminar todo lo demás
+      .replace(/[^a-zA-Z0-9_\-áéíóúÁÉÍÓÚñÑ]/g, "")
+  );
+  return parts.join("_");
+}
+
+// ══════════════════════════════════════════════════
+// LÓGICA DE INTERFAZ — CONDICIONALES
+// ══════════════════════════════════════════════════
+
+/**
+ * Alterna el estado de un documento condicional y actualiza la UI.
+ * Es la única vía para modificar S.conds desde un clic en tarjeta.
+ * El checkbox interno se sincroniza programáticamente (no dispara 'change').
+ *
+ * @param   {string} key - Clave del condicional (debe existir en S.conds)
+ * @returns {void}
+ * @example toggleCond("docAdicionalA");
+ */
+function toggleCond(key) {
+  const newVal = !S.conds[key];
+  S.conds[key] = newVal;
+  el("cond_" + key).checked = newVal;
+  el("lbl_" + key).classList.toggle("checked", newVal);
+  invalidate();
+  onUpdate();
+}
+
+// ══════════════════════════════════════════════════
+// LÓGICA DE INTERFAZ — PÁGINAS VARIABLES
+// ══════════════════════════════════════════════════
+
+/**
+ * Incrementa o decrementa el conteo de páginas de un documento variable.
+ * Respeta los límites min/max del catálogo y deshabilita los botones en los extremos.
+ *
+ * @param   {string} key   - Clave del documento variable en S.varPg y CATALOG
+ * @param   {number} delta - Cambio a aplicar (+1 o -1)
+ * @returns {void}
+ * @example changePage("contrato", +1); // incrementa páginas del contrato
+ */
+function changePage(key, delta) {
+  const doc = CATALOG.find(d => d.varKey === key);
+  const nv  = S.varPg[key] + delta;
+  if (nv < doc.min || nv > doc.max) return;
+
+  S.varPg[key] = nv;
+  const valEl = el("val_" + key);
+  // Pequeña animación de escala para retroalimentación visual
+  valEl.style.transform = "scale(1.3)";
+  setTimeout(() => valEl.style.transform = "", 200);
+  valEl.textContent = nv;
+
+  el("btn_" + key + "_minus").disabled = (nv <= doc.min);
+  el("btn_" + key + "_plus").disabled  = (nv >= doc.max);
+  invalidate();
+  onUpdate();
+}
+
+// ══════════════════════════════════════════════════
+// EFECTOS VISUALES
+// ══════════════════════════════════════════════════
+
+/**
+ * Crea el efecto ripple (onda) al hacer clic en un botón.
+ * Calcula la posición del clic relativa al botón para centrar la onda ahí.
+ *
+ * @param   {HTMLElement}   btn - Botón donde ocurre el efecto
+ * @param   {MouseEvent}    e   - Evento de clic con coordenadas
+ * @returns {void}
+ */
+function addRipple(btn, e) {
+  const r = btn.getBoundingClientRect();
+  const d = document.createElement("span");
+  d.className  = "ripple";
+  d.style.left = (e.clientX - r.left  - 5) + "px";
+  d.style.top  = (e.clientY - r.top   - 5) + "px";
+  btn.appendChild(d);
+  // Limpieza del nodo tras completar la animación (600ms = duración del keyframe)
+  setTimeout(() => d.remove(), 600);
+}
+
+/**
+ * Hace scroll suave hacia un elemento con un leve retraso.
+ * El retraso (120ms) permite que la UI termine de actualizarse antes de desplazarse,
+ * evitando calcular posiciones sobre un DOM en transición.
+ *
+ * @param   {string} id - ID del elemento destino
+ * @returns {void}
+ */
+function smoothScroll(id) {
+  setTimeout(() => el(id)?.scrollIntoView({ behavior: "smooth", block: "start" }), 120);
+}
+
+// ══════════════════════════════════════════════════
+// CICLO PRINCIPAL DE ACTUALIZACIÓN
+// ══════════════════════════════════════════════════
+
+/**
+ * Punto central de actualización de la interfaz.
+ * Lee los campos de texto, invalida la caché y desencadena la actualización
+ * de todos los componentes visuales en el orden correcto.
+ *
+ * S.conds NO se lee aquí — es gestionado exclusivamente por toggleCond()
+ * y el handler 'change' del checkbox para mantener una única fuente de verdad.
+ *
+ * @returns {void}
+ */
+function onUpdate() {
+  S.numExpediente = el("numExpediente").value.trim();
+  S.nombreTitular = el("nombreTitular").value.trim();
+  invalidate();
+
+  const { total } = computed();
+  el("totalEsp").textContent    = total;
+  el("valExpected").textContent = total;
+
+  if (S.pdfPages > 0) updatePagesStatus();
+  updateTable();
+  updateRail();
+  updateLocks();
+  updateButton();
+}
+
+// ══════════════════════════════════════════════════
+// ESTADO DE PÁGINAS (PASO 2)
+// ══════════════════════════════════════════════════
+
+/**
+ * Actualiza los indicadores numéricos y el mensaje de estado tras cargar un PDF.
+ * Compara páginas del PDF vs. páginas esperadas y muestra alerta ok/warn/err.
+ * Las sugerencias de causas se generan dinámicamente desde el CATÁLOGO.
+ *
+ * @returns {void}
+ */
+function updatePagesStatus() {
+  const { total } = computed();
+  const loaded = S.pdfPages, diff = loaded - total, match = diff === 0;
+
+  el("valLoaded").textContent   = loaded;
+  el("valExpected").textContent = total;
+  el("valDiff").textContent     = match ? "✓ OK" : (diff > 0 ? "+" + diff : String(diff));
+
+  ["boxLoaded", "boxExpected", "boxDiff"].forEach(id => {
+    el(id).className = "pbox " + (match ? "ok" : "bad");
+  });
+
+  const alertEl = el("pagesAlert");
+  if (match) {
+    alertEl.innerHTML = `<div class="alert ok"><span class="alert-icon">✅</span>
+      <span>Las páginas del PDF coinciden con la configuración. Puedes continuar al paso 4.</span></div>`;
+    smoothScroll("card4");
+  } else if (diff > 0) {
+    // Generar sugerencias dinámicamente para ser independiente del catálogo concreto
+    const varSugs = CATALOG
+      .filter(d => d.tipo === "variable")
+      .map(d => `"${escapeHtml(d.label)}" con ${S.varPg[d.varKey] === d.min ? d.max : d.min} pág.`)
+      .join(" · ");
+    alertEl.innerHTML = `<div class="alert warn"><span class="alert-icon">⚠️</span><div>
+      El PDF tiene <strong>${diff} página(s) de más</strong>.<br>
+      <strong>Posibles causas:</strong> revisa ${varSugs}, o un condicional sin marcar.
+    </div></div>`;
+  } else {
+    alertEl.innerHTML = `<div class="alert err"><span class="alert-icon">❌</span><div>
+      El PDF tiene <strong>${Math.abs(diff)} página(s) de menos</strong>.<br>
+      <strong>Posibles causas:</strong> condicional marcado que no se incluyó en el PDF, o páginas faltantes.
+    </div></div>`;
+  }
+}
+
+// ══════════════════════════════════════════════════
+// TABLA DE ASIGNACIÓN DE PÁGINAS (PASO 3)
+// ══════════════════════════════════════════════════
+
+/**
+ * Renderiza la tabla de vista previa con la asignación documento → rango de páginas.
+ * Los datos del CATÁLOGO (label, nombre, tipo) son hardcoded y seguros para innerHTML.
+ * El sufijo de identificador pasa por escapeHtml() como defensa adicional.
+ *
+ * @returns {void}
+ */
+function updateTable() {
+  const { ranges } = computed();
+  const hasPDF = S.pdfPages > 0;
+
+  if (!ranges.length) {
+    el("tableContainer").innerHTML = `<p style="color:var(--muted);font-size:13px">Carga el PDF para ver la asignación de páginas.</p>`;
+    return;
+  }
+
+  // El identificador ya viene sanitizado por buildId(); escapeHtml es defensa extra
+  const rawId      = buildId();
+  const safeSuffix = rawId ? "_" + escapeHtml(rawId) : "";
+
+  const rows = ranges.map((d, i) => {
+    const ok   = !hasPDF || d.end <= S.pdfPages;
+    const chip = ok ? "range-chip" : "range-chip bad";
+    return `<tr style="animation-delay:${i * 0.03}s">
+      <td><span class="seq-dot">${d.seq}</span></td>
+      <td style="font-weight:600">${d.label}</td>
+      <td><span class="tag ${d.tipo}">${d.tipo}</span></td>
+      <td style="text-align:center;font-weight:700;color:var(--primary)">${d.pg}</td>
+      <td><span class="${chip}">${d.start} – ${d.end}</span></td>
+      <td class="fname">${d.seq}_${d.nombre}${safeSuffix}.pdf</td>
+    </tr>`;
+  }).join("");
+
+  el("tableContainer").innerHTML = `
+    <table class="doc-table">
+      <thead><tr>
+        <th>#</th><th>Documento</th><th>Tipo</th>
+        <th style="text-align:center">Págs.</th><th>Rango</th><th>Nombre del archivo</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+// ══════════════════════════════════════════════════
+// INDICADOR DE PROGRESO (RAIL)
+// ══════════════════════════════════════════════════
+
+/**
+ * Actualiza los círculos y líneas del indicador de pasos según el progreso actual.
+ * Estados posibles por paso: "" (inactivo), "active" (en curso), "done" (completado).
+ *
+ * @returns {void}
+ */
+function updateRail() {
+  const hasPDF  = S.pdfPages > 0;
+  const pagesOK = hasPDF && S.pdfPages === computed().total;
+
+  /**
+   * Aplica el estado visual a un paso del rail.
+   * @param {number} n     - Número de paso (1–4)
+   * @param {string} state - "done" | "active" | ""
+   */
+  function setStep(n, state) {
+    const dot = el("rd" + n);
+    dot.className   = "rail-dot " + state;
+    dot.textContent = state === "done" ? "✓" : String(n);
+    if (n < 4) {
+      const ln = el("rl" + n);
+      if (ln) ln.className = "rail-line" + (state === "done" ? " done" : "");
+    }
+  }
+
+  setStep(1, "done");
+  setStep(2, hasPDF  ? "done"   : "active");
+  setStep(3, pagesOK ? "done"   : hasPDF ? "active" : "");
+  setStep(4, pagesOK ? "active" : "");
+}
+
+// ══════════════════════════════════════════════════
+// BLOQUEO / DESBLOQUEO DE TARJETAS
+// ══════════════════════════════════════════════════
+
+/**
+ * Bloquea o desbloquea las tarjetas según el progreso del usuario.
+ * Una tarjeta bloqueada es visualmente atenuada y no acepta interacciones (pointer-events: none).
+ * card1 siempre está disponible; card2 se desbloquea al inicio; card3/4 requieren pasos previos.
+ *
+ * @returns {void}
+ */
+function updateLocks() {
+  const hasPDF  = S.pdfPages > 0;
+  const pagesOK = hasPDF && S.pdfPages === computed().total;
+  el("card2").classList.remove("locked");
+  el("card3").classList.toggle("locked", !hasPDF);
+  el("card4").classList.toggle("locked", !pagesOK);
+}
+
+// ══════════════════════════════════════════════════
+// ESTADO DEL BOTÓN PRINCIPAL (PASO 4)
+// ══════════════════════════════════════════════════
+
+/**
+ * Actualiza el estado habilitado/deshabilitado del botón y su mensaje de ayuda.
+ * textContent se usa para el mensaje de estado (evita XSS con el ID del expediente).
+ *
+ * @returns {void}
+ */
+function updateButton() {
+  const pagesOK = S.pdfPages > 0 && S.pdfPages === computed().total;
+  el("btnCut").disabled = !pagesOK;
+  const id = buildId();
+
+  if (!S.pdfPages)   el("statusMsg").textContent = "⬆ Carga el PDF en el Paso 2.";
+  else if (!pagesOK) el("statusMsg").textContent = "⬆ Ajusta la configuración hasta que las páginas coincidan.";
+  else if (!id)      el("statusMsg").textContent = `✅ Listo (sin identificador) — ${computed().ranges.length} docs.`;
+  else               el("statusMsg").textContent = `✅ Listo — ${computed().ranges.length} documentos · ID: ${id}`;
+}
+
+// ══════════════════════════════════════════════════
+// RECUPERACIÓN DE ZONA DE CARGA TRAS ERROR
+// ══════════════════════════════════════════════════
+
+/**
+ * Recrea la zona de carga en estado de error tras un fallo en loadPDF.
+ * Construye todos los nodos por DOM (sin innerHTML de datos de usuario) para
+ * prevenir inyección XSS a través del mensaje de error de la librería pdf-lib.
+ *
+ * @param   {string} errorMsg - Mensaje de error a mostrar al usuario
+ * @returns {void}
+ */
+function resetDropZone(errorMsg) {
+  const dz = el("dropZone");
+  dz.className = "upload-zone";
+
+  // Recrear el input sin handler inline (se enlaza con addEventListener)
+  const inp = document.createElement("input");
+  inp.type   = "file";
+  inp.id     = "pdfInput";
+  inp.accept = ".pdf";
+  inp.addEventListener("change", loadPDF);
+
+  const icon = document.createElement("div");
+  icon.className   = "upload-icon";
+  icon.textContent = "❌";
+
+  const title = document.createElement("h3");
+  title.textContent = "Error al leer el PDF";
+
+  const msg = document.createElement("p");
+  msg.textContent = errorMsg; // textContent imposibilita inyección HTML
+
+  dz.replaceChildren(inp, icon, title, msg);
+
+  // Mostrar la alerta de error también en la zona de páginas
+  const alertEl  = el("pagesAlert");
+  const alertDiv = document.createElement("div");
+  alertDiv.className = "alert err";
+  const alertIcon = document.createElement("span");
+  alertIcon.className   = "alert-icon";
+  alertIcon.textContent = "❌";
+  const alertMsg = document.createElement("span");
+  alertMsg.textContent  = errorMsg;
+  alertDiv.append(alertIcon, alertMsg);
+  alertEl.replaceChildren(alertDiv);
+}
+
+// ══════════════════════════════════════════════════
+// CARGA DE PDF (PASO 2)
+// ══════════════════════════════════════════════════
+
+/**
+ * Carga y parsea el PDF seleccionado por el usuario.
+ * Cachea la instancia PDFDocument en S.pdfDoc para que cutPDF() pueda reutilizarla
+ * sin volver a parsear el archivo (operación costosa).
+ * Usa nodos DOM (no innerHTML) para mostrar el nombre del archivo y evitar XSS.
+ *
+ * @param   {Event} event - Evento 'change' del input file (o sintético desde drag & drop)
+ * @returns {Promise<void>}
+ */
+async function loadPDF(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const dz = el("dropZone");
+
+  // Estado de carga: UI estática + nombre de archivo por textContent
+  dz.replaceChildren();
+  const loadIcon = document.createElement("div");
+  loadIcon.className   = "upload-icon";
+  // Solo el spinner tiene HTML estático — no hay datos de usuario aquí
+  loadIcon.innerHTML   = `<span class="spin" style="display:inline-block;width:32px;height:32px;border-width:3px;border-color:rgba(109,15,42,.2);border-top-color:var(--primary)"></span>`;
+  const loadTitle = document.createElement("h3");
+  loadTitle.textContent = "Cargando...";
+  const loadName = document.createElement("p");
+  loadName.textContent  = file.name; // textContent escapa automáticamente
+  dz.append(loadIcon, loadTitle, loadName);
+
+  try {
+    const ab   = await file.arrayBuffer();
+    S.pdfBytes = new Uint8Array(ab);
+    // Cachear el PDFDocument aquí; cutPDF lo reutiliza sin re-parsear
+    S.pdfDoc   = await PDFLib.PDFDocument.load(S.pdfBytes);
+    S.pdfPages = S.pdfDoc.getPageCount();
+
+    dz.className = "upload-zone loaded";
+    dz.replaceChildren();
+    const okIcon = document.createElement("div");
+    okIcon.className   = "upload-icon";
+    okIcon.textContent = "✅";
+    const okTitle = document.createElement("h3");
+    okTitle.textContent = file.name;
+    const okMsg = document.createElement("p");
+    okMsg.textContent   = `${S.pdfPages} páginas cargadas correctamente`;
+    dz.append(okIcon, okTitle, okMsg);
+
+    el("pagesRow").classList.remove("hidden");
+    updatePagesStatus();
+    updateTable();
+    updateRail();
+    updateLocks();
+    updateButton();
+    smoothScroll("card3");
+  } catch (e) {
+    resetDropZone(e.message);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// SOPORTE DRAG & DROP
+// ══════════════════════════════════════════════════
+
+/**
+ * Inicializa los eventos de arrastrar y soltar sobre la zona de carga.
+ * Solo acepta archivos PDF (MIME application/pdf).
+ * Se extrae en función propia para mantener init() limpio.
+ *
+ * @returns {void}
+ */
+function initDragDrop() {
+  const dz = el("dropZone");
+  dz.addEventListener("dragover",  e => { e.preventDefault(); dz.classList.add("drag"); });
+  dz.addEventListener("dragleave", ()  => dz.classList.remove("drag"));
+  dz.addEventListener("drop", e => {
+    e.preventDefault();
+    dz.classList.remove("drag");
+    const f = e.dataTransfer.files[0];
+    // Crear evento sintético compatible con loadPDF
+    if (f && f.type === "application/pdf") loadPDF({ target: { files: [f] } });
+  });
+}
+
+// ══════════════════════════════════════════════════
+// CORTE Y DESCARGA DEL PDF (PASO 4)
+// ══════════════════════════════════════════════════
+
+/**
+ * Divide el PDF en documentos individuales y los empaqueta en un ZIP.
+ * Usa Promise.all para corte en paralelo — todos los PDFs se crean simultáneamente,
+ * lo que es significativamente más rápido que hacerlo secuencialmente.
+ * La barra de progreso refleja cuántos PDFs individuales han terminado de generarse.
+ * Reutiliza S.pdfDoc (ya cacheado en loadPDF) sin re-parsear el archivo.
+ *
+ * @param   {MouseEvent} [event] - Evento de clic del botón (para el efecto ripple)
+ * @returns {Promise<void>}
+ */
+async function cutPDF(event) {
+  if (event) addRipple(el("btnCut"), event);
+
+  const btn  = el("btnCut");
+  const prog = el("progressWrap");
+  const bar  = el("progressBar");
+  const lbl  = el("progressLabel");
+  const res  = el("cutResult");
+
+  btn.disabled  = true;
+  btn.innerHTML = `<span class="spin"></span><span>Procesando...</span>`;
+  prog.classList.remove("hidden");
+  lbl.classList.remove("hidden");
+  bar.style.width = "0%";
+  res.innerHTML   = "";
+
+  try {
+    const { ranges } = computed();
+    const srcDoc = S.pdfDoc; // Reutilizar instancia cacheada — no re-parsear
+    const id     = buildId();
+    const suffix = id ? "_" + id : "";
+
+    let done = 0;
+    lbl.textContent = `Creando ${ranges.length} documentos en paralelo...`;
+
+    // Corte paralelo: cada documento genera un nuevo PDFDocument independiente
+    const splitResults = await Promise.all(
+      ranges.map(async d => {
+        const nd     = await PDFLib.PDFDocument.create();
+        const idxs   = Array.from({ length: d.end - d.start + 1 }, (_, i) => d.start - 1 + i);
+        const copied = await nd.copyPages(srcDoc, idxs);
+        copied.forEach(pg => nd.addPage(pg));
+        const bytes  = await nd.save();
+        // Actualizar la barra en tiempo real conforme cada PDF termina
+        done++;
+        bar.style.width = `${Math.round((done / ranges.length) * 85)}%`;
+        return { name: `${d.seq}_${d.nombre}${suffix}.pdf`, bytes, label: d.label };
+      })
+    );
+
+    lbl.textContent = "Empaquetando ZIP...";
+    bar.style.width = "90%";
+
+    const zip  = new JSZip();
+    splitResults.forEach(({ name, bytes }) => zip.file(name, bytes));
+    const blob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
+
+    bar.style.width = "100%";
+
+    const zipName = `PDF_Splitter${suffix}.zip`;
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement("a");
+    a.href     = url;
+    a.download = zipName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Liberar la URL de objeto para evitar retención de memoria
+    URL.revokeObjectURL(url);
+
+    lbl.textContent = "¡Completado!";
+    res.appendChild(buildSuccessNode(splitResults.length, zipName));
+    spawnConfetti(res);
+
+    btn.innerHTML = `<span id="btnIcon">✂️</span><span id="btnText">Cortar y Descargar ZIP</span>`;
+    btn.disabled  = false;
+    el("rd4").className   = "rail-dot done";
+    el("rd4").textContent = "✓";
+
+  } catch (e) {
+    lbl.textContent = "";
+
+    // Construir el error por DOM — textContent evita inyección HTML del mensaje de la librería
+    const errWrap = document.createElement("div");
+    errWrap.className = "alert err";
+    const errIcon = document.createElement("span");
+    errIcon.className   = "alert-icon";
+    errIcon.textContent = "❌";
+    const errMsg = document.createElement("span");
+    errMsg.textContent  = "Error al procesar: " + e.message;
+    errWrap.append(errIcon, errMsg);
+    res.replaceChildren(errWrap);
+
+    btn.innerHTML = `<span id="btnIcon">✂️</span><span id="btnText">Cortar y Descargar ZIP</span>`;
+    btn.disabled  = false;
+    prog.classList.add("hidden");
+    lbl.classList.add("hidden");
+  }
+}
+
+// ══════════════════════════════════════════════════
+// NODO DE ÉXITO
+// ══════════════════════════════════════════════════
+
+/**
+ * Construye y devuelve el nodo DOM de la caja de éxito tras un corte exitoso.
+ * Se construye por DOM (no innerHTML de datos de usuario):
+ *   - count es un número entero (siempre seguro)
+ *   - zipName se pasa por escapeHtml() como defensa en profundidad
+ *
+ * @param   {number} count   - Número de documentos PDF generados
+ * @param   {string} zipName - Nombre del archivo ZIP descargado
+ * @returns {HTMLElement} Nodo listo para insertar en el DOM
+ */
+function buildSuccessNode(count, zipName) {
+  const wrap = document.createElement("div");
+  wrap.className = "success-box confetti-wrap";
+  wrap.id        = "successBox";
+
+  const circle = document.createElement("div");
+  circle.className = "check-circle";
+  // SVG con animación de trazo definida en CSS (@keyframes checkDraw)
+  circle.innerHTML  = `<svg viewBox="0 0 28 28"><path d="M5 14 L11 20 L23 8"/></svg>`;
+
+  const textWrap = document.createElement("div");
+  textWrap.className = "success-text";
+
+  const heading = document.createElement("h3");
+  heading.textContent = "¡Documentos generados correctamente!";
+
+  const desc = document.createElement("p");
+  // count (número) y escapeHtml(zipName) son seguros para innerHTML
+  desc.innerHTML = `Se crearon <strong>${count} documentos PDF</strong> en el archivo <code>${escapeHtml(zipName)}</code>.<br>
+    Revisa tu carpeta de Descargas.`;
+
+  textWrap.append(heading, desc);
+  wrap.append(circle, textWrap);
+  return wrap;
+}
+
+// ══════════════════════════════════════════════════
+// EFECTO CONFETTI
+// ══════════════════════════════════════════════════
+
+/**
+ * Genera partículas de confetti animadas dentro del contenedor de éxito.
+ * Las partículas se insertan en el elemento con clase `.confetti-wrap`
+ * y se eliminan automáticamente al finalizar la animación CSS.
+ *
+ * @param   {HTMLElement} container - Elemento que contiene un hijo .confetti-wrap
+ * @returns {void}
+ */
+function spawnConfetti(container) {
+  const colors = ["#6D0F2A", "#C4980A", "#1E7E4A", "#3730A3", "#B45309", "#059669"];
+  const wrap   = container.querySelector(".confetti-wrap");
+  if (!wrap) return;
+
+  for (let i = 0; i < 28; i++) {
+    const d = document.createElement("div");
+    d.className = "confetti-dot";
+    d.style.left              = Math.random() * 100 + "%";
+    d.style.background        = colors[Math.floor(Math.random() * colors.length)];
+    d.style.width             = (6 + Math.random() * 6) + "px";
+    d.style.height            = (6 + Math.random() * 6) + "px";
+    d.style.animationDelay    = Math.random() * 0.6 + "s";
+    d.style.animationDuration = (0.9 + Math.random() * 0.6) + "s";
+    wrap.appendChild(d);
+    // Limpieza del nodo tras la animación para no acumular elementos inactivos en el DOM
+    setTimeout(() => d.remove(), 1800);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// INICIALIZACIÓN
+// ══════════════════════════════════════════════════
+
+/**
+ * Inicializa la aplicación: enlaza todos los eventos del DOM con sus handlers.
+ * Este patrón centralizado (en lugar de atributos onX="..." en HTML) mantiene
+ * el HTML semántico y desacoplado de la lógica, y facilita el mantenimiento.
+ *
+ * @returns {void}
+ */
+function init() {
+  // Inputs de texto con debounce: evita recalcular en cada pulsación de tecla
+  const debouncedUpdate = debounce(onUpdate, 150);
+  el("numExpediente").addEventListener("input", debouncedUpdate);
+  el("nombreTitular").addEventListener("input", debouncedUpdate);
+
+  // Condicionales: clic en la tarjeta activa toggleCond; el checkbox maneja su propio camino
+  ["docAdicionalA", "docEspecialB"].forEach(key => {
+    el("lbl_" + key).addEventListener("click", () => toggleCond(key));
+    // stopPropagation evita doble disparo cuando el clic cae sobre el checkbox interno
+    el("cond_" + key).addEventListener("click", e => e.stopPropagation());
+    // Ruta alternativa: activación por teclado (Tab + Espacio) o clic directo en checkbox
+    el("cond_" + key).addEventListener("change", e => {
+      S.conds[key] = e.target.checked;
+      el("lbl_" + key).classList.toggle("checked", e.target.checked);
+      invalidate();
+      onUpdate();
+    });
+  });
+
+  // Steppers de páginas variables
+  el("btn_contrato_minus").addEventListener("click", () => changePage("contrato", -1));
+  el("btn_contrato_plus").addEventListener("click",  () => changePage("contrato", +1));
+  el("btn_anexo_minus").addEventListener("click",    () => changePage("anexo",    -1));
+  el("btn_anexo_plus").addEventListener("click",     () => changePage("anexo",    +1));
+
+  // Carga de archivo y drag & drop
+  el("pdfInput").addEventListener("change", loadPDF);
+  initDragDrop();
+
+  // Botón principal de corte
+  el("btnCut").addEventListener("click", e => cutPDF(e));
+
+  // Render inicial para sincronizar la UI con el estado por defecto
+  onUpdate();
+}
+
+// El script está al final del body, por lo que el DOM ya está disponible al ejecutar
+init();
+</script>
+</body>
+</html>
