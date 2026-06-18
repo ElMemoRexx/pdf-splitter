@@ -1,0 +1,1224 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  Cortador de Expediente Documental — PDF Splitter             ║
+  ║  Versión  : 1.8.7                                           ║
+  ║  Autor    : ElMemoRexx                                       ║
+  ║  Licencia : MIT · github.com/ElMemoRexx                      ║
+  ║  Fecha    : 2025                                             ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cortador de Expediente — PDF Splitter</title>
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --primary:#6D0F2A;--primary-h:#8B1535;--accent:#C4980A;
+  --ok:#1E7E4A;--warn:#B45309;--err:#B91C1C;
+  --bg:#F5F6F8;--card:#FFFFFF;--border:#DDE1E7;
+  --text:#1A1A2E;--muted:#6B7280;
+  --radius-sm:8px;--radius-md:12px;--radius-lg:14px;
+  --shadow-sm:0 1px 5px rgba(0,0,0,.05);--shadow-md:0 4px 16px rgba(0,0,0,.09);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,Arial,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+/* ── ANIMACIONES ── */
+@keyframes fadeUp   {from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn   {from{opacity:0}to{opacity:1}}
+@keyframes scaleIn  {from{opacity:0;transform:scale(.88)}to{opacity:1;transform:scale(1)}}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse    {0%,100%{box-shadow:0 0 0 0 rgba(109,15,42,.35)}50%{box-shadow:0 0 0 8px rgba(109,15,42,0)}}
+@keyframes spin     {to{transform:rotate(360deg)}}
+@keyframes bounce   {0%,100%{transform:scale(1)}40%{transform:scale(1.25)}70%{transform:scale(.9)}}
+@keyframes ripple   {to{transform:scale(4);opacity:0}}
+@keyframes checkDraw{from{stroke-dashoffset:60}to{stroke-dashoffset:0}}
+@keyframes shimmer  {0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes confettiFall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(200px) rotate(720deg);opacity:0}}
+/* ── HEADER ── */
+header{background:var(--primary);color:#fff;padding:12px 24px;display:flex;align-items:center;gap:16px;box-shadow:0 2px 10px rgba(0,0,0,.35);position:sticky;top:0;z-index:20;animation:fadeIn .5s ease both}
+
+
+.header-title{flex:1;text-align:center}
+header h1{font-size:17px;font-weight:700;line-height:1.2}
+header p{font-size:11px;opacity:.75;margin-top:2px}
+.badge{background:var(--accent);color:#fff;font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;flex-shrink:0}
+/* ── RAIL ── */
+.rail{display:flex;align-items:center;padding:18px 28px 0;max-width:960px;margin:0 auto;animation:fadeIn .6s ease .2s both}
+.rail-step{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:60px}
+.rail-dot{width:30px;height:30px;border-radius:50%;background:var(--border);color:var(--muted);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:background .4s,color .4s,transform .3s}
+.rail-dot.active{background:var(--primary);color:#fff;animation:pulse 1.8s infinite}
+.rail-dot.done{background:var(--ok);color:#fff;transform:scale(1.1)}
+.rail-label{font-size:10px;color:var(--muted);font-weight:600;text-align:center}
+.rail-line{flex:1;height:3px;background:var(--border);border-radius:2px;margin-bottom:14px;transition:background .5s}
+.rail-line.done{background:var(--ok)}
+/* ── CARDS ── */
+main{max-width:960px;margin:20px auto;padding:0 16px 60px;display:flex;flex-direction:column;gap:18px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-sm);transition:opacity .4s,filter .4s,box-shadow .3s;animation:fadeUp .5s ease both}
+.card:nth-child(1){animation-delay:.05s}.card:nth-child(2){animation-delay:.12s}.card:nth-child(3){animation-delay:.19s}.card:nth-child(4){animation-delay:.26s}
+.card.locked{opacity:.4;filter:grayscale(.2);pointer-events:none}
+.card:hover:not(.locked){box-shadow:var(--shadow-md)}
+.card-head{display:flex;align-items:flex-start;gap:14px;padding-bottom:18px;margin-bottom:20px;border-bottom:1px solid var(--border)}
+.step-circle{width:34px;height:34px;border-radius:50%;background:var(--primary);color:#fff;font-weight:800;font-size:15px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.card-head h2{font-size:15px;font-weight:700;color:var(--primary)}
+.card-head p{font-size:12px;color:var(--muted);margin-top:3px}
+/* ── FORM ── */
+.form-row{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:4px}
+.form-group{flex:1;min-width:200px}
+.form-group label{display:block;font-size:12px;font-weight:700;margin-bottom:5px}
+.field-wrap{position:relative}
+.field-wrap input{width:100%;padding:10px 36px 10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;outline:none;transition:border-color .2s,box-shadow .2s}
+.field-wrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(109,15,42,.12)}
+.field-icon{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:15px;pointer-events:none;opacity:.4}
+.optional-badge{display:inline-block;font-size:10px;font-weight:700;background:#F1F3F6;color:var(--muted);padding:1px 6px;border-radius:4px;margin-left:5px;text-transform:uppercase;letter-spacing:.3px}
+.form-hint{font-size:11px;color:var(--muted);margin-top:5px;margin-bottom:16px}
+.sec-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:20px 0 10px}
+/* ── CONDICIONALES ── */
+.cond-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+/* Usar <label> para que el clic en cualquier parte del card active el checkbox */
+.cond-item{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;position:relative;transition:border-color .25s,background .25s,transform .2s,box-shadow .2s;user-select:none}
+.cond-item:hover{border-color:var(--primary);background:#fdf4f7;transform:translateY(-1px);box-shadow:0 3px 10px rgba(109,15,42,.1)}
+.cond-item.checked{border-color:var(--primary);background:#fdf4f7;box-shadow:0 2px 8px rgba(109,15,42,.15)}
+.cond-item input[type="checkbox"]{accent-color:var(--primary);margin-top:3px;flex-shrink:0;width:16px;height:16px;cursor:pointer}
+.cond-name{font-size:13px;font-weight:700}
+.cond-desc{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+/* Tooltip */
+.tip-icon{position:absolute;top:10px;right:10px;width:16px;height:16px;border-radius:50%;background:var(--border);color:var(--muted);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:help}
+.tip-icon::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 6px);right:0;background:#1A1A2E;color:#fff;font-size:11px;font-weight:400;padding:7px 10px;border-radius:7px;width:200px;line-height:1.4;white-space:normal;pointer-events:none;opacity:0;transform:translateY(4px);transition:opacity .2s,transform .2s;z-index:100}
+.tip-icon:hover::after{opacity:1;transform:translateY(0)}
+/* ── VARIABLES ── */
+.var-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.var-card{border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.var-card .vc-label{font-size:13px;font-weight:700}
+.var-card .vc-desc{font-size:11px;color:var(--muted);margin:3px 0 12px}
+.stepper{display:flex;align-items:center;gap:10px}
+.step-btn{width:30px;height:30px;border-radius:7px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:18px;font-weight:700;color:var(--primary);display:flex;align-items:center;justify-content:center;transition:background .15s,border-color .15s}
+.step-btn:hover:not(:disabled){background:#fdf4f7;border-color:var(--primary)}
+.step-btn:active:not(:disabled){animation:bounce .35s ease}
+.step-btn:disabled{opacity:.3;cursor:not-allowed}
+.step-val{font-size:26px;font-weight:800;color:var(--primary);min-width:38px;text-align:center;transition:transform .15s}
+.step-range{font-size:11px;color:var(--muted)}
+.total-row{margin-top:20px;padding:14px 18px;background:#F8F9FA;border-radius:10px;display:flex;justify-content:space-between;align-items:center}
+.total-row .tl{font-size:13px;color:var(--muted)}
+.total-row .tv{font-size:26px;font-weight:800;color:var(--primary);transition:color .3s}
+/* ── UPLOAD ── */
+.upload-zone{border:2px dashed var(--border);border-radius:var(--radius-md);padding:36px 24px;text-align:center;cursor:pointer;position:relative;transition:border-color .2s,background .2s,transform .2s}
+.upload-zone:hover,.upload-zone.drag{border-color:var(--primary);background:#fdf4f7;transform:scale(1.01)}
+.upload-zone input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.upload-icon{font-size:44px;margin-bottom:10px;transition:transform .3s}
+.upload-zone:hover .upload-icon{transform:scale(1.1)}
+.upload-zone h3{font-size:15px;font-weight:700;color:var(--primary)}
+.upload-zone p{font-size:12px;color:var(--muted);margin-top:4px}
+.upload-zone.loaded{border-style:solid;border-color:var(--ok);background:#F0FAF4;animation:scaleIn .4s ease}
+.pages-row{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+.pbox{flex:1;min-width:110px;border:1px solid var(--border);border-radius:10px;padding:14px 16px;text-align:center;transition:border-color .4s,background .4s}
+.pbox .pv{font-size:28px;font-weight:800;transition:color .4s}
+.pbox .pl{font-size:10px;text-transform:uppercase;font-weight:700;color:var(--muted);margin-top:2px}
+.pbox.ok{border-color:var(--ok);background:#F0FAF4}.pbox.ok .pv{color:var(--ok)}
+.pbox.bad{border-color:var(--err);background:#FEF2F2}.pbox.bad .pv{color:var(--err)}
+.pbox.info .pv{color:var(--primary)}
+/* ── ALERTAS ── */
+.alert{display:flex;align-items:flex-start;gap:10px;padding:12px 16px;border-radius:9px;font-size:13px;margin-top:12px;line-height:1.5;animation:slideDown .3s ease both}
+.alert.ok{background:#F0FAF4;border:1px solid #6EE7A0;color:#1A5C34}
+.alert.warn{background:#FFFBEB;border:1px solid #FCD34D;color:#78350F}
+.alert.err{background:#FEF2F2;border:1px solid #FCA5A5;color:#7F1D1D}
+.alert-icon{flex-shrink:0;font-size:16px;margin-top:1px}
+/* ── MINIATURAS ── */
+.preview-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+/* Grid de 4 columnas en desktop, responsivo */
+.preview-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.preview-card{border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:box-shadow .2s,transform .25s;background:var(--card);animation:scaleIn .3s ease both}
+.preview-card:hover{box-shadow:var(--shadow-md);transform:translateY(-3px)}
+/* Contenedor de la imagen — más alto para mejor visualización */
+.preview-canvas-wrap{
+  height:200px;background:#F1F3F6;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;position:relative;
+  border-bottom:1px solid var(--border);
+}
+.preview-canvas-wrap canvas{
+  max-width:100%;max-height:100%;
+  display:block;
+  /* Suavizar el escalado del canvas para mejor calidad visual */
+  image-rendering:auto;
+}
+.preview-skeleton{width:100%;height:100%;background:linear-gradient(90deg,#E5E7EB 25%,#F3F4F6 50%,#E5E7EB 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+.preview-info{padding:10px 12px}
+.preview-seq{display:inline-block;font-size:10px;font-weight:800;background:var(--primary);color:#fff;padding:2px 7px;border-radius:5px;margin-bottom:5px}
+.preview-name{font-size:12px;font-weight:700;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.preview-range{font-size:11px;color:var(--muted);font-family:'Consolas',monospace;margin-top:3px}
+.preview-ok{border-color:var(--ok)}
+.preview-warn{border-color:var(--warn)}
+/* ── TABLA ── */
+.doc-table{width:100%;border-collapse:collapse;font-size:12px}
+.doc-table thead th{background:#F1F3F6;padding:9px 12px;text-align:left;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);border-bottom:2px solid var(--border)}
+.doc-table tbody td{padding:9px 12px;border-bottom:1px solid #F0F2F5;vertical-align:middle}
+.doc-table tbody tr{transition:background .15s;animation:fadeIn .25s ease both}
+.doc-table tbody tr:hover td{background:#FAFBFC}
+.doc-table tbody tr:last-child td{border-bottom:none}
+.seq-dot{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--primary);color:#fff;font-size:10px;font-weight:800}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;text-transform:uppercase;letter-spacing:.3px}
+.tag.fijo{background:#EEF2FF;color:#3730A3}
+.tag.variable{background:#FFF8E1;color:#92400E}
+.tag.condicional{background:#ECFDF5;color:#065F46}
+.range-chip{font-family:'Consolas',monospace;font-size:11px;font-weight:700;color:var(--primary);background:#FDF4F7;padding:3px 8px;border-radius:5px}
+.range-chip.bad{color:var(--err);background:#FEF2F2}
+.fname{font-family:'Consolas',monospace;font-size:10px;color:var(--muted)}
+/* ── BOTONES ── */
+.action-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.btn-main{background:var(--primary);color:#fff;border:none;padding:13px 28px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:10px;transition:background .2s,transform .1s,box-shadow .2s;position:relative;overflow:hidden}
+.btn-main:hover:not(:disabled){background:var(--primary-h);box-shadow:0 4px 14px rgba(109,15,42,.4)}
+.btn-main:active:not(:disabled){transform:scale(.97)}
+.btn-main:disabled{background:#9CA3AF;cursor:not-allowed;box-shadow:none}
+.btn-secondary{background:#F1F3F6;color:var(--text);border:1px solid var(--border);padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:background .15s,border-color .15s}
+.btn-secondary:hover{background:#E5E7EB;border-color:#C9CDD4}
+.btn-main .ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.35);width:10px;height:10px;transform:scale(0);animation:ripple .6s linear;pointer-events:none}
+.status-msg{font-size:12px;color:var(--muted)}
+.progress{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-top:14px}
+.progress-bar{height:100%;background:var(--primary);width:0%;transition:width .3s ease;border-radius:3px}
+.progress-label{font-size:11px;color:var(--muted);margin-top:6px;min-height:16px}
+/* ── ÉXITO ── */
+.success-box{margin-top:16px;padding:20px 24px;background:#F0FAF4;border:1px solid #6EE7A0;border-radius:var(--radius-md);display:flex;align-items:center;gap:20px;animation:scaleIn .4s ease both}
+.check-circle{width:52px;height:52px;border-radius:50%;background:var(--ok);flex-shrink:0;display:flex;align-items:center;justify-content:center}
+.check-circle svg{width:28px;height:28px}
+.check-circle svg path{stroke:#fff;stroke-width:3;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:60;stroke-dashoffset:60;animation:checkDraw .4s ease .2s forwards}
+.success-text h3{font-size:15px;font-weight:700;color:var(--ok)}
+.success-text p{font-size:13px;color:#1A5C34;margin-top:4px}
+.success-text code{background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:12px}
+.confetti-wrap{position:relative;overflow:hidden;border-radius:var(--radius-md)}
+.confetti-dot{position:absolute;top:-10px;width:8px;height:8px;border-radius:2px;animation:confettiFall 1.2s ease forwards;pointer-events:none}
+/* Banco selector */
+.banco-selector{display:flex;gap:10px;flex-wrap:wrap}
+.banco-option{flex:1;min-width:200px;display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border:1.5px solid var(--border);background:#FAFBFC;border-radius:10px;cursor:pointer;transition:border-color .2s,background .2s;user-select:none}
+.banco-option.selected{border-color:var(--primary);background:#fdf4f7}
+.banco-option input[type="radio"]{accent-color:var(--primary);margin-top:3px;flex-shrink:0;cursor:pointer}
+/* ── UTILS ── */
+.hidden{display:none!important}
+.spin{display:inline-block;width:18px;height:18px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+footer{text-align:center;color:var(--muted);font-size:11px;padding:20px}
+@media(max-width:600px){
+  header{padding:10px 14px}
+  main{padding:0 10px 40px}
+  .card{padding:18px 14px}
+  .preview-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .preview-canvas-wrap{height:160px}
+}
+</style>
+</head>
+<body>
+
+<header>
+
+
+
+  <div class="header-title">
+    <h1>✂️ Cortador de Expediente Documental</h1>
+    <p>Procesamiento 100% local &middot; ningun archivo sale del equipo</p>
+  </div>
+  <span class="badge">v1.8.7</span>
+</header>
+
+<div class="rail">
+  <div class="rail-step"><div class="rail-dot active" id="rd1">1</div><div class="rail-label">Configurar</div></div>
+  <div class="rail-line" id="rl1"></div>
+  <div class="rail-step"><div class="rail-dot" id="rd2">2</div><div class="rail-label">Cargar PDF</div></div>
+  <div class="rail-line" id="rl2"></div>
+  <div class="rail-step"><div class="rail-dot" id="rd3">3</div><div class="rail-label">Verificar</div></div>
+  <div class="rail-line" id="rl3"></div>
+  <div class="rail-step"><div class="rail-dot" id="rd4">4</div><div class="rail-label">Generar</div></div>
+</div>
+
+<main>
+
+<!-- ══ PASO 1 ══ -->
+<div class="card" id="card1">
+  <div class="card-head">
+    <div class="step-circle">1</div>
+    <div>
+      <h2>Configuración del Expediente</h2>
+      <p>Ingresa el identificador del titular y configura los documentos que aplican en este caso.</p>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>Número de Crédito <span class="optional-badge">Opcional</span></label>
+      <div class="field-wrap">
+        <input type="text" id="numCredito" placeholder="Ej. 1234567890" oninput="App.onUpdate()" maxlength="20"/>
+        <span class="field-icon">🔢</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Nombre del Titular <span class="optional-badge">Opcional</span></label>
+      <div class="field-wrap">
+        <input type="text" id="nombreDH" placeholder="Ej. Juan López García" oninput="App.onUpdate()" maxlength="60"/>
+        <span class="field-icon">👤</span>
+      </div>
+    </div>
+  </div>
+  <p class="form-hint">Si se proporcionan, se incluyen en los nombres de los archivos generados.</p>
+
+  <!-- TIPO DE IDENTIFICACIÓN OFICIAL -->
+  <div class="sec-title">🪪 Tipo de Identificación Oficial</div>
+  <div class="banco-selector" style="flex-wrap:wrap;gap:8px">
+
+    <label class="banco-option selected" id="lbl_id_ine" for="radio_id_ine" style="min-width:150px">
+      <input type="radio" id="radio_id_ine" name="tipoID" value="ine" checked
+        onchange="UI.setTipoIdentificacion('ine')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">INE / IFE</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Credencial para votar vigente</div>
+      </div>
+    </label>
+
+    <label class="banco-option" id="lbl_id_pasaporte" for="radio_id_pasaporte" style="min-width:150px">
+      <input type="radio" id="radio_id_pasaporte" name="tipoID" value="pasaporte"
+        onchange="UI.setTipoIdentificacion('pasaporte')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">Pasaporte</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Vigente — emitido por SRE</div>
+      </div>
+    </label>
+
+    <label class="banco-option" id="lbl_id_cedula" for="radio_id_cedula" style="min-width:150px">
+      <input type="radio" id="radio_id_cedula" name="tipoID" value="cedula"
+        onchange="UI.setTipoIdentificacion('cedula')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">Cédula Profesional</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Con fotografía vigente</div>
+      </div>
+    </label>
+
+    <label class="banco-option" id="lbl_id_cartilla" for="radio_id_cartilla" style="min-width:150px">
+      <input type="radio" id="radio_id_cartilla" name="tipoID" value="cartilla"
+        onchange="UI.setTipoIdentificacion('cartilla')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">Cartilla Militar</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Liberada — con fotografía</div>
+      </div>
+    </label>
+
+    <label class="banco-option" id="lbl_id_fm2" for="radio_id_fm2" style="min-width:150px">
+      <input type="radio" id="radio_id_fm2" name="tipoID" value="fm2"
+        onchange="UI.setTipoIdentificacion('fm2')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">FM2 / FM3</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Extranjeros con residencia</div>
+      </div>
+    </label>
+
+  </div>
+
+  <!-- CONDICIONALES — FIX: uso de <label> nativo + onchange en el checkbox
+       para que el clic funcione desde cualquier parte del card -->
+  <div class="sec-title" style="margin-top:20px">📋 Documentos Condicionales — Marcar los que aplican</div>
+  <div class="cond-grid">
+
+    <!-- Validación INE: solo visible cuando tipo ID = INE -->
+    <div id="wrap_validacionINE">
+    <label class="cond-item" id="lbl_validacionINE" for="cond_validacionINE">
+      <input type="checkbox" id="cond_validacionINE" onchange="UI.onCondChange('validacionINE',this)"/>
+      <div><div class="cond-name">Validación INE (Lista Nominal)</div>
+           <div class="cond-desc">Impresión de vigencia de credencial</div></div>
+      <span class="tip-icon" data-tip="Aplica cuando el titular se identifica con INE/IFE.">?</span>
+    </label>
+    </div>
+
+    <label class="cond-item" id="lbl_actaFamiliar" for="cond_actaFamiliar">
+      <input type="checkbox" id="cond_actaFamiliar" onchange="UI.onCondChange('actaFamiliar',this)"/>
+      <div><div class="cond-name">Acta de Nacimiento del Familiar</div>
+           <div class="cond-desc">Vivienda a nombre de familiar</div></div>
+      <span class="tip-icon" data-tip="Aplica cuando la vivienda está a nombre de un familiar hasta 2° grado de consanguineidad.">?</span>
+    </label>
+
+    <label class="cond-item" id="lbl_actaMatrimonio" for="cond_actaMatrimonio">
+      <input type="checkbox" id="cond_actaMatrimonio" onchange="UI.onCondChange('actaMatrimonio',this)"/>
+      <div><div class="cond-name">Acta de Matrimonio / Concubinato</div>
+           <div class="cond-desc">Propiedad a nombre del cónyuge</div></div>
+      <span class="tip-icon" data-tip="Aplica cuando la propiedad esta a nombre del conyuge o concubino del titular.">?</span>
+    </label>
+
+    <label class="cond-item" id="lbl_acuseNotif" for="cond_acuseNotif">
+      <input type="checkbox" id="cond_acuseNotif" onchange="UI.onCondChange('acuseNotif',this)"/>
+      <div><div class="cond-name">Acuse de Notificación de Inicio de Trámite</div>
+           <div class="cond-desc">Normalmente presente al inicio del tramite, desmarcar si no se escaneo</div></div>
+      <span class="tip-icon" data-tip="Documento de 1 hoja emitido al inicio del tramite. Marcar si se incluyo en el escaneo.">?</span>
+    </label>
+
+    <label class="cond-item" id="lbl_avisoRetencion" for="cond_avisoRetencion">
+      <input type="checkbox" id="cond_avisoRetencion" onchange="UI.onCondChange('avisoRetencion',this)"/>
+      <div><div class="cond-name">Aviso de Retención de Descuentos</div>
+           <div class="cond-desc">El patrón requiere notificación previa</div></div>
+      <span class="tip-icon" data-tip="Solo cuando el patrón requiere ser notificado formalmente del inicio del descuento vía nómina.">?</span>
+    </label>
+
+  </div>
+
+  <!-- Stepper de páginas del Aviso de Retención — visible solo cuando el condicional está marcado.
+       1 hoja = aviso con sello · 2 hojas = sin sello + carta adjunta -->
+  <div id="avisoRetPagesWrap" class="hidden" style="margin-top:12px">
+    <div class="var-card" style="max-width:360px">
+      <div class="vc-label">Aviso de Retención de Descuentos</div>
+      <div class="vc-desc">1 hoja si trae sello. 2 hojas si no tiene sello y se anexa carta adjunta.</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_avisoRet_minus" onclick="UI.changePage('avisoRet',-1)" disabled>−</button>
+        <div class="step-val" id="val_avisoRet">1</div>
+        <button class="step-btn" id="btn_avisoRet_plus"  onclick="UI.changePage('avisoRet',+1)">+</button>
+        <span class="step-range">mín 1 / máx 2</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec-title">📄 Documentos con Páginas Variables</div>
+  <div class="var-grid">
+    <div class="var-card">
+      <div class="vc-label">Contrato de Apertura de Crédito Simple</div>
+      <div class="vc-desc">Verifica cuántas páginas tiene el contrato antes de escanear</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_contrato_minus" onclick="UI.changePage('contrato',-1)" disabled>−</button>
+        <div class="step-val" id="val_contrato">17</div>
+        <button class="step-btn" id="btn_contrato_plus"  onclick="UI.changePage('contrato',+1)">+</button>
+        <span class="step-range">mín 17 / máx 18</span>
+      </div>
+    </div>
+    <div class="var-card">
+      <div class="vc-label">Carátula del Contrato de Crédito</div>
+      <div class="vc-desc">Numero de caratulas del contrato de credito</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_caratula_minus" onclick="UI.changePage('caratula',-1)" disabled>−</button>
+        <div class="step-val" id="val_caratula">1</div>
+        <button class="step-btn" id="btn_caratula_plus"  onclick="UI.changePage('caratula',+1)">+</button>
+        <span class="step-range">mín 1 / máx 8</span>
+      </div>
+    </div>
+    <div class="var-card">
+      <div class="vc-label">Constancia de Situación Fiscal (RFC)</div>
+      <div class="vc-desc">Normalmente 1 hoja; puede variar entre 1 o 2 paginas.</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_rfc_minus" onclick="UI.changePage('rfc',-1)" disabled>−</button>
+        <div class="step-val" id="val_rfc">1</div>
+        <button class="step-btn" id="btn_rfc_plus"  onclick="UI.changePage('rfc',+1)">+</button>
+        <span class="step-range">mín 1 / máx 2</span>
+      </div>
+    </div>
+    <div class="var-card">
+      <div class="vc-label">Tabla de Amortización</div>
+      <div class="vc-desc">Depende del plazo y monto del crédito</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_tabla_minus" onclick="UI.changePage('tabla',-1)" disabled>−</button>
+        <div class="step-val" id="val_tabla">1</div>
+        <button class="step-btn" id="btn_tabla_plus"  onclick="UI.changePage('tabla',+1)">+</button>
+        <span class="step-range">mín 1 / máx 2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- BANCO -->
+  <div class="sec-title">🏦 Documento Bancario del Derechohabiente</div>
+  <div class="banco-selector">
+    <label class="banco-option selected" id="lbl_banco_estado" for="radio_banco_estado">
+      <input type="radio" id="radio_banco_estado" name="tipoBanco" value="estado_cuenta" checked
+        onchange="UI.setTipoDocBancario('estado_cuenta')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">Estado de Cuenta Bancario</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Normalmente 1 página — ajusta si el banco incluye páginas adicionales (ej. Coppel con RFC al final)</div>
+      </div>
+    </label>
+    <label class="banco-option" id="lbl_banco_contrato" for="radio_banco_contrato">
+      <input type="radio" id="radio_banco_contrato" name="tipoBanco" value="contrato_apertura"
+        onchange="UI.setTipoDocBancario('contrato_apertura')"/>
+      <div>
+        <div style="font-size:13px;font-weight:700">Contrato de Apertura Bancaria</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Variable 1–8 páginas — vigencia no mayor a 1 mes</div>
+      </div>
+    </label>
+  </div>
+
+  <!-- Steppers de páginas bancarias — se muestran según el tipo seleccionado -->
+  <div id="estadoCuentaPagesWrap" style="margin-top:12px">
+    <div class="var-card" style="max-width:320px">
+      <div class="vc-label">Estado de Cuenta Bancario</div>
+      <div class="vc-desc">Ajusta si el banco incluye páginas adicionales al final (ej. Coppel incluye el RFC en la última hoja — hasta 4 páginas)</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_estadoCuenta_minus" onclick="UI.changePage('estadoCuenta',-1)" disabled>−</button>
+        <div class="step-val" id="val_estadoCuenta">1</div>
+        <button class="step-btn" id="btn_estadoCuenta_plus"  onclick="UI.changePage('estadoCuenta',+1)">+</button>
+        <span class="step-range">mín 1 / máx 4</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="bancoPagesWrap" class="hidden" style="margin-top:12px">
+    <div class="var-card" style="max-width:280px">
+      <div class="vc-label">Contrato de Apertura Bancaria</div>
+      <div class="vc-desc">Número de páginas del contrato presentado</div>
+      <div class="stepper">
+        <button class="step-btn" id="btn_banco_minus" onclick="UI.changePage('banco',-1)" disabled>−</button>
+        <div class="step-val" id="val_banco">1</div>
+        <button class="step-btn" id="btn_banco_plus"  onclick="UI.changePage('banco',+1)">+</button>
+        <span class="step-range">mín 1 / máx 8</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="total-row">
+    <span class="tl">Total de páginas esperadas en el PDF escaneado:</span>
+    <span class="tv" id="totalEsp">—</span>
+  </div>
+</div>
+
+<!-- ══ PASO 2 ══ -->
+<div class="card locked" id="card2">
+  <div class="card-head">
+    <div class="step-circle">2</div>
+    <div>
+      <h2>Cargar PDF Escaneado</h2>
+      <p>Selecciona el archivo con todos los documentos escaneados en orden. Todo se procesa localmente.</p>
+    </div>
+  </div>
+  <div class="upload-zone" id="dropZone">
+    <input type="file" id="pdfInput" accept=".pdf" onchange="PDFService.loadSingle(event)"/>
+    <div class="upload-icon">📄</div>
+    <h3>Haz clic aquí o arrastra el PDF</h3>
+    <p>Solo archivos .pdf &nbsp;·&nbsp; Procesamiento 100% local</p>
+  </div>
+  <div class="pages-row hidden" id="pagesRow">
+    <div class="pbox info" id="boxLoaded">  <div class="pv" id="valLoaded">—</div>  <div class="pl">Páginas en el PDF</div></div>
+    <div class="pbox info" id="boxExpected"><div class="pv" id="valExpected">—</div><div class="pl">Páginas esperadas</div></div>
+    <div class="pbox info" id="boxDiff">    <div class="pv" id="valDiff">—</div>    <div class="pl">Diferencia</div></div>
+  </div>
+  <div id="pagesAlert"></div>
+</div>
+
+<!-- ══ PASO 3 ══ -->
+<div class="card locked" id="card3">
+  <div class="card-head">
+    <div class="step-circle">3</div>
+    <div>
+      <h2>Vista Previa de Documentos</h2>
+      <p>Verifica que cada sección corresponde al documento correcto antes de generar el ZIP.</p>
+    </div>
+  </div>
+  <div class="preview-toolbar">
+    <button class="btn-secondary" id="btnTabThumb" onclick="UI.setPreviewTab('thumbs')" style="font-size:12px;padding:7px 14px;background:#E8D5DA">🖼 Miniaturas</button>
+    <button class="btn-secondary" id="btnTabTable" onclick="UI.setPreviewTab('table')"  style="font-size:12px;padding:7px 14px">📋 Tabla detallada</button>
+  </div>
+  <div id="previewThumbs">
+    <p style="color:var(--muted);font-size:13px" id="previewPlaceholder">Carga un PDF para ver las miniaturas de cada sección.</p>
+    <div class="preview-grid" id="previewGrid"></div>
+  </div>
+  <div id="previewTable" class="hidden">
+    <div id="tableContainer"><p style="color:var(--muted);font-size:13px">Carga el PDF para ver la asignación de páginas.</p></div>
+  </div>
+</div>
+
+<!-- ══ PASO 4 ══ -->
+<div class="card locked" id="card4">
+  <div class="card-head">
+    <div class="step-circle">4</div>
+    <div>
+      <h2>Generar y Descargar Documentos</h2>
+      <p>Se descargara un archivo ZIP con los PDFs nombrados y ordenados.</p>
+    </div>
+  </div>
+  <div class="action-row">
+    <button class="btn-main" id="btnCut" onclick="PDFService.cut(event)" disabled>
+      <span id="btnIcon">✂️</span><span id="btnText">Cortar y Descargar ZIP</span>
+    </button>
+    <span class="status-msg" id="statusMsg">Completa los pasos anteriores para continuar.</span>
+  </div>
+  <div class="progress hidden" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="progress-label hidden" id="progressLabel"></div>
+  <div id="cutResult"></div>
+</div>
+
+</main>
+<footer>PDF Splitter &middot; Procesamiento 100% local &mdash; ningun archivo sale del equipo &middot; v1.8.7</footer>
+
+<script>
+"use strict";
+
+/* ════ HELPERS ════ */
+const el = id => document.getElementById(id);
+function escapeHtml(s){const d=document.createElement("div");d.textContent=String(s);return d.innerHTML}
+function addRipple(btn,e){const r=btn.getBoundingClientRect(),d=document.createElement("span");d.className="ripple";d.style.left=(e.clientX-r.left-5)+"px";d.style.top=(e.clientY-r.top-5)+"px";btn.appendChild(d);setTimeout(()=>d.remove(),600)}
+function smoothScroll(id){setTimeout(()=>el(id)?.scrollIntoView({behavior:"smooth",block:"start"}),120)}
+
+/* ════════════════════════════════════════════════════
+   CONFIG — Catalogo de documentos del expediente
+   ════════════════════════════════════════════════════ */
+
+const CONFIG = {
+  CATALOG: [
+    {id:"solicitud",     nombre:"Solicitud_Inscripcion_Credito",        label:"Solicitud de Inscripción de Crédito",           pg:2, tipo:"fijo"},
+    {id:"ine",           nombre:"Identificacion_Oficial",                label:"Identificación Oficial",                       pg:1, tipo:"fijo", esDinamicoID:true},
+    {id:"validacion_ine",nombre:"Validacion_INE",                        label:"Validación INE (Lista Nominal)",                pg:1, tipo:"condicional",cond:"validacionINE"},
+    {id:"acta_titular",   nombre:"Acta_Nacimiento_Titular",               label:"Acta de Nacimiento del Titular",                pg:1, tipo:"fijo"},
+    {id:"acta_familiar", nombre:"Acta_Nacimiento_Familiar",              label:"Acta de Nacimiento del Familiar",              pg:1, tipo:"condicional",cond:"actaFamiliar"},
+    {id:"acta_matri",    nombre:"Acta_Matrimonio_Concubinato",           label:"Acta de Matrimonio / Concubinato",              pg:1, tipo:"condicional",cond:"actaMatrimonio"},
+    {id:"curp",          nombre:"CURP",                                  label:"CURP",                                          pg:1, tipo:"fijo"},
+    {id:"rfc",           nombre:"Constancia_Situacion_Fiscal_RFC",       label:"Constancia de Situación Fiscal (RFC)",          pg:1, tipo:"variable",varKey:"rfc",min:1,max:2},
+    {id:"comprobante",   nombre:"Comprobante_Domicilio",                 label:"Comprobante de Domicilio",                      pg:1, tipo:"fijo"},
+    {id:"carta_protesta",nombre:"Carta_Bajo_Protesta",                   label:"Carta Bajo Protesta de Decir Verdad",           pg:2, tipo:"fijo"},
+    {id:"presupuesto",   nombre:"Presupuesto_Proyecto_Obra",             label:"Presupuesto / Proyecto de Obra",                pg:1, tipo:"fijo"},
+    // ORDEN FÍSICO DEL ESCÁNER (confirmado en 11_Formato_SIC.pdf):
+    //   Página 1 → Acuse de Notificación de Inicio de Trámite (1 hoja) — condicional:
+    //             normalmente presente, pero no siempre incluido en el scanner.
+    //   Página 2 → Formato SIC / Consentimiento Historial Crediticio (2 hojas)
+    // El Acuse va ANTES del SIC en el catálogo para que el corte sea correcto.
+    {id:"acuse_notif",   nombre:"Acuse_Notificacion_Inicio_Tramite",      label:"Acuse de Notificación de Inicio de Trámite",   pg:1, tipo:"condicional",cond:"acuseNotif"},
+    {id:"sic",           nombre:"Formato_SIC",                           label:"Formato SIC (Autorización Consulta Crediticia)",pg:2, tipo:"fijo"},
+    {id:"aviso_ret",     nombre:"Aviso_Retencion_Descuentos",            label:"Aviso de Retención de Descuentos",              pg:1, tipo:"condicional",cond:"avisoRetencion",varKey:"avisoRet",min:1,max:2},
+    {id:"contrato",      nombre:"Contrato_Apertura_Credito",             label:"Contrato de Apertura de Crédito Simple",        pg:17,tipo:"variable",varKey:"contrato",min:17,max:18},
+    {id:"constancia",    nombre:"Constancia_Credito",                    label:"Constancia de Crédito",                        pg:2, tipo:"fijo"},
+    {id:"anexo_b",       nombre:"Anexo_B_Condiciones_Financieras",       label:"Anexo B — Carta de Condiciones Financieras",   pg:2, tipo:"fijo"},
+    // Slot dinámico: Estado de Cuenta O Contrato de Apertura Bancaria
+    {id:"estado_cuenta", nombre:"Estado_Cuenta_Bancario",                label:"Estado de Cuenta Bancario",                    pg:1, tipo:"fijo", esDinamico:true},
+    {id:"doc_prev",      nombre:"Documento_Preventivo",                  label:"Documento Preventivo",                         pg:1, tipo:"fijo"},
+    {id:"caratula",      nombre:"Caratula_Contrato_Credito",             label:"Carátula del Contrato de Crédito",              pg:1, tipo:"variable",varKey:"caratula",min:1,max:8},
+    {id:"tabla_amort",   nombre:"Tabla_Amortizacion",                    label:"Tabla de Amortización",                        pg:1, tipo:"variable",varKey:"tabla",min:1,max:2},
+  ],
+
+  /**
+   * Retorna la definición del documento bancario según el tipo activo.
+   * Estado de Cuenta → fijo 1p | Contrato de Apertura → variable 1-8p
+   */
+  getDocBancario(){
+    if(AppState.tipoDocBancario==="contrato_apertura"){
+      return{id:"doc_bancario",nombre:"Contrato_Apertura_Bancaria",label:"Contrato de Apertura Bancaria",
+             pg:AppState.varPg.banco,tipo:"variable",varKey:"banco",min:1,max:8};
+    }
+    // Estado de Cuenta: normalmente 1 página, pero algunos bancos (ej. Coppel)
+    // incluyen el RFC/constancia fiscal al final → hasta 4 páginas.
+    return{id:"doc_bancario",nombre:"Estado_Cuenta_Bancario",label:"Estado de Cuenta Bancario",
+           pg:AppState.varPg.estadoCuenta,tipo:"variable",varKey:"estadoCuenta",min:1,max:4};
+  },
+
+  CONFETTI_COLORS:["#6D0F2A","#C4980A","#1E7E4A","#3730A3","#B45309","#059669"],
+};
+
+/* ════════════════════════════════════════════════════
+   AppState — Estado centralizado de la aplicación
+   ════════════════════════════════════════════════════ */
+const AppState = {
+  numCredito:"", nombreDH:"",
+  /** Condicionales activos en este expediente */
+  conds:{validacionINE:false,actaFamiliar:false,actaMatrimonio:false,avisoRetencion:false,acuseNotif:false},
+  /** Páginas de documentos variables */
+  varPg:{contrato:17,caratula:1,rfc:1,tabla:1,banco:1,estadoCuenta:1,avisoRet:1},
+  /** Tipo de identificación oficial presentada */
+  tipoIdentificacion:"ine",
+  /** Tipo de documento bancario */
+  tipoDocBancario:"estado_cuenta",
+  /** PDF activo */
+  pdfBytes:null, pdfDoc:null, pdfPages:0,
+  /** Pestaña activa en vista previa */
+  previewTab:"thumbs",
+};
+
+/* ════════════════════════════════════════════════════
+   ComputedState — Estado derivado con caché
+   ════════════════════════════════════════════════════ */
+const ComputedState=(()=>{
+  let _c=null;
+  return{
+    invalidate(){_c=null},
+    /**
+     * Calcula docs activos, rangos y total de páginas.
+     * Usa caché para evitar recómputos redundantes en cada ciclo de UI.
+     */
+    get(){
+      if(_c) return _c;
+      const conds=AppState.conds, varPg=AppState.varPg;
+      // Mapa de tipos de identificación → nombre de archivo
+      const ID_NOMBRES={
+        ine:       "Identificacion_Oficial_INE",
+        pasaporte: "Identificacion_Oficial_Pasaporte",
+        cedula:    "Identificacion_Oficial_Cedula_Profesional",
+        cartilla:  "Identificacion_Oficial_Cartilla_Militar",
+        fm2:       "Identificacion_Oficial_FM2_FM3",
+      };
+      const ID_LABELS={
+        ine:       "Identificación Oficial (INE/IFE)",
+        pasaporte: "Identificación Oficial (Pasaporte)",
+        cedula:    "Identificación Oficial (Cédula Profesional)",
+        cartilla:  "Identificación Oficial (Cartilla Militar)",
+        fm2:       "Identificación Oficial (FM2/FM3)",
+      };
+      const tipoID=AppState.tipoIdentificacion||"ine";
+      const docs=CONFIG.CATALOG
+        .filter(d=>d.tipo!=="condicional"||conds[d.cond])
+        .map((d,i)=>{
+          let dr=d.esDinamico?CONFIG.getDocBancario():d;
+          // Resolución dinámica del tipo de identificación
+          if(dr.esDinamicoID){
+            dr={...dr,
+              nombre: ID_NOMBRES[tipoID]||ID_NOMBRES.ine,
+              label:  ID_LABELS[tipoID] ||ID_LABELS.ine,
+            };
+          }
+          return{...dr,pg:dr.varKey?(varPg[dr.varKey]??dr.pg):dr.pg,seq:String(i+1).padStart(2,"0")};
+        });
+      let p=1;
+      const ranges=docs.map(d=>{const s=p,e=p+d.pg-1;p=e+1;return{...d,start:s,end:e}});
+      const total=docs.reduce((s,d)=>s+d.pg,0);
+      _c={docs,ranges,total};
+      return _c;
+    }
+  };
+})();
+
+/* ════════════════════════════════════════════════════
+   Identifier — Sufijo para nombres de archivo
+   ════════════════════════════════════════════════════ */
+const Identifier={
+  build(){
+    const p=[];
+    if(AppState.numCredito) p.push(AppState.numCredito);
+    if(AppState.nombreDH)   p.push(AppState.nombreDH.trim().replace(/\s+/g,"_").replace(/[^a-zA-Z0-9_\-áéíóúÁÉÍÓÚñÑ]/g,""));
+    return p.join("_");
+  }
+};
+
+/* ════════════════════════════════════════════════════
+   UI — Manipulación del DOM
+   ════════════════════════════════════════════════════ */
+const UI={
+
+  /**
+   * Manejador de cambio en checkbox condicional.
+   * Lee el valor real del checkbox (fuente de verdad) para evitar
+   * problemas de sincronización entre el DOM y AppState.
+   * @param {string}           key      - Clave del condicional
+   * @param {HTMLInputElement} checkbox - El checkbox que cambió
+   */
+  onCondChange(key,checkbox){
+    AppState.conds[key]=checkbox.checked;
+    el("lbl_"+key).classList.toggle("checked",checkbox.checked);
+    // El Aviso de Retención puede ser de 1 o 2 páginas: mostrar su stepper solo si está marcado
+    if(key==="avisoRetencion"){
+      el("avisoRetPagesWrap")?.classList.toggle("hidden",!checkbox.checked);
+    }
+    ComputedState.invalidate();
+    App.onUpdate();
+  },
+
+  /**
+   * Ajusta páginas de un documento variable.
+   * @param {string} key   - Clave en AppState.varPg
+   * @param {number} delta - +1 o -1
+   */
+  changePage(key,delta){
+    // Las claves "banco" y "estadoCuenta" son dinámicas (no están en el CATALOG estático)
+    const RANGOS_EXTRA={banco:{min:1,max:8},estadoCuenta:{min:1,max:4}};
+    const def=CONFIG.CATALOG.find(d=>d.varKey===key)||RANGOS_EXTRA[key]||{min:1,max:99};
+    const nv=AppState.varPg[key]+delta;
+    if(nv<def.min||nv>def.max) return;
+    AppState.varPg[key]=nv;
+    const v=el("val_"+key);
+    if(v){v.style.transform="scale(1.35)";setTimeout(()=>v.style.transform="",200);v.textContent=nv}
+    const bm=el("btn_"+key+"_minus"),bp=el("btn_"+key+"_plus");
+    if(bm) bm.disabled=(nv<=def.min);
+    if(bp) bp.disabled=(nv>=def.max);
+    ComputedState.invalidate();
+    App.onUpdate();
+  },
+
+  /**
+   * Cambia el tipo de identificación oficial.
+   * Actualiza el nombre del archivo en el catálogo y la visibilidad del condicional Validación INE.
+   * @param {"ine"|"pasaporte"|"cedula"|"cartilla"|"fm2"} tipo
+   */
+  setTipoIdentificacion(tipo){
+    AppState.tipoIdentificacion=tipo;
+    // La Validación INE solo aplica cuando la identificación es INE/IFE
+    const esINE=(tipo==="ine");
+    // Si cambia a no-INE, desmarcar la validación INE automáticamente
+    if(!esINE && AppState.conds.validacionINE){
+      AppState.conds.validacionINE=false;
+      const cb=el("cond_validacionINE");
+      if(cb) cb.checked=false;
+      el("lbl_validacionINE")?.classList.remove("checked");
+    }
+    // Mostrar/ocultar el checkbox de Validación INE según aplique
+    const wrapVal=el("wrap_validacionINE");
+    if(wrapVal) wrapVal.style.display=esINE?"":"none";
+
+    // Marcar la opción seleccionada
+    ["ine","pasaporte","cedula","cartilla","fm2"].forEach(t=>{
+      el("lbl_id_"+t)?.classList.toggle("selected",t===tipo);
+    });
+    ComputedState.invalidate();
+    App.onUpdate();
+  },
+
+  /**
+   * Cambia el tipo de documento bancario.
+   * Muestra/oculta el stepper de páginas del contrato de apertura.
+   * @param {"estado_cuenta"|"contrato_apertura"} tipo
+   */
+  setTipoDocBancario(tipo){
+    AppState.tipoDocBancario=tipo;
+    const esCA=tipo==="contrato_apertura";
+    const le=el("lbl_banco_estado"),lc=el("lbl_banco_contrato");
+    if(le) le.classList.toggle("selected",!esCA);
+    if(lc) lc.classList.toggle("selected",esCA);
+    // Estado de Cuenta → mostrar su stepper, ocultar el de Contrato de Apertura
+    el("estadoCuentaPagesWrap")?.classList.toggle("hidden", esCA);
+    // Contrato de Apertura → mostrar su stepper, ocultar el de Estado de Cuenta
+    el("bancoPagesWrap")?.classList.toggle("hidden",!esCA);
+    ComputedState.invalidate();
+    App.onUpdate();
+  },
+
+  /** Cambia pestaña activa en la vista previa */
+  setPreviewTab(tab){
+    AppState.previewTab=tab;
+    el("previewThumbs").classList.toggle("hidden",tab!=="thumbs");
+    el("previewTable" ).classList.toggle("hidden",tab!=="table");
+    el("btnTabThumb"  ).style.background=tab==="thumbs"?"#E8D5DA":"";
+    el("btnTabTable"  ).style.background=tab==="table" ?"#E8D5DA":"";
+  },
+
+  /** Actualiza total de páginas esperadas */
+  updateTotalEsperado(){
+    const{total}=ComputedState.get();
+    el("totalEsp").textContent=total;
+    el("valExpected").textContent=total;
+  },
+
+  /** Actualiza rail de pasos */
+  updateRail(){
+    const hasPDF=AppState.pdfPages>0;
+    const ok=hasPDF&&AppState.pdfPages===ComputedState.get().total;
+    const s=(n,state)=>{
+      const d=el("rd"+n);d.className="rail-dot "+state;d.textContent=state==="done"?"✓":String(n);
+      if(n<4){const l=el("rl"+n);if(l)l.className="rail-line"+(state==="done"?" done":"")}
+    };
+    s(1,"done");s(2,hasPDF?"done":"active");s(3,ok?"done":hasPDF?"active":"");s(4,ok?"active":"");
+  },
+
+  /** Bloquea/desbloquea cards según progreso */
+  updateLocks(){
+    const hasPDF=AppState.pdfPages>0;
+    const ok=hasPDF&&AppState.pdfPages===ComputedState.get().total;
+    el("card2").classList.remove("locked");
+    el("card3").classList.toggle("locked",!hasPDF);
+    el("card4").classList.toggle("locked",!ok);
+  },
+
+  /** Actualiza estado del botón de corte */
+  updateButton(){
+    const{total,ranges}=ComputedState.get();
+    const ok=AppState.pdfPages>0&&AppState.pdfPages===total;
+    el("btnCut").disabled=!ok;
+    const id=Identifier.build();
+    if(!AppState.pdfPages)  el("statusMsg").textContent="⬆ Carga el PDF escaneado en el Paso 2.";
+    else if(!ok)            el("statusMsg").textContent="⬆ Ajusta la configuración hasta que las páginas coincidan.";
+    else el("statusMsg").textContent=`✅ Listo — ${ranges.length} documentos${id?" · ID: "+id:""}`;
+  },
+
+  /** Muestra indicadores de páginas cargadas vs esperadas */
+  updatePagesStatus(){
+    const{total}=ComputedState.get();
+    const loaded=AppState.pdfPages,diff=loaded-total,match=diff===0;
+    el("valLoaded").textContent=loaded;el("valExpected").textContent=total;
+    el("valDiff").textContent=match?"✓ OK":(diff>0?"+"+diff:String(diff));
+    ["boxLoaded","boxExpected","boxDiff"].forEach(id=>el(id).className="pbox "+(match?"ok":"bad"));
+    const a=el("pagesAlert");
+    if(match){
+      a.innerHTML=`<div class="alert ok"><span class="alert-icon">✅</span><span>Las páginas coinciden exactamente. Puedes continuar al Paso 3.</span></div>`;
+      smoothScroll("card3");
+    }else if(diff>0){
+      a.innerHTML=`<div class="alert warn"><span class="alert-icon">⚠️</span><div>
+        El PDF tiene <strong>${diff} página(s) de más</strong>.<br>
+        <strong>Posibles causas:</strong> contrato con ${AppState.varPg.contrato===17?18:17}p, tabla con ${AppState.varPg.tabla===1?2:1}p, RFC con 2p, o un condicional sin marcar.
+      </div></div>`;
+    }else{
+      a.innerHTML=`<div class="alert err"><span class="alert-icon">❌</span><div>
+        El PDF tiene <strong>${Math.abs(diff)} página(s) de menos</strong>.<br>
+        <strong>Posibles causas:</strong> condicional marcado que no se escaneó, o páginas faltantes en el escáner.
+      </div></div>`;
+    }
+  },
+
+  /** Renderiza tabla de asignación de páginas */
+  updateTable(){
+    const{ranges}=ComputedState.get();
+    const id=Identifier.build(),sfx=id?"_"+id:"",hasPDF=AppState.pdfPages>0;
+    if(!ranges.length){el("tableContainer").innerHTML=`<p style="color:var(--muted);font-size:13px">Carga el PDF para ver la asignación.</p>`;return}
+    el("tableContainer").innerHTML=`<table class="doc-table"><thead><tr>
+      <th>#</th><th>Documento</th><th>Tipo</th><th style="text-align:center">Págs.</th><th>Rango</th><th>Nombre del archivo</th>
+    </tr></thead><tbody>${ranges.map((d,i)=>{
+      const ok=!hasPDF||d.end<=AppState.pdfPages;
+      return`<tr style="animation-delay:${i*.03}s">
+        <td><span class="seq-dot">${escapeHtml(d.seq)}</span></td>
+        <td style="font-weight:600">${escapeHtml(d.label)}</td>
+        <td><span class="tag ${d.tipo}">${d.tipo}</span></td>
+        <td style="text-align:center;font-weight:700;color:var(--primary)">${d.pg}</td>
+        <td><span class="${ok?"range-chip":"range-chip bad"}">${d.start}–${d.end}</span></td>
+        <td class="fname">${escapeHtml(d.seq+"_"+d.nombre+sfx)}.pdf</td>
+      </tr>`;
+    }).join("")}</tbody></table>`;
+  },
+
+  /**
+   * LEGADO (v1.8.5) — Ya no se invoca: desde v1.8.6 el grid completo se
+   * reconstruye dinámicamente vía PreviewService.scheduleRender(), lo que
+   * sincroniza tanto etiquetas como las imágenes de las miniaturas.
+   */
+  updatePreviewLabels(){
+    const{ranges}=ComputedState.get();
+    ranges.forEach((d,i)=>{
+      const sq=el("prevSeq_"+i),nm=el("prevName_"+i),rg=el("prevRange_"+i);
+      if(sq) sq.textContent=d.seq;
+      if(nm){nm.textContent=d.label;nm.title=d.label}
+      if(rg) rg.textContent=`Págs. ${d.start}–${d.end} (${d.pg} hoja${d.pg>1?"s":""})`;
+    });
+  },
+
+  /** Muestra caja de éxito con checkmark animado y confetti */
+  showSuccess(numDocs,zipName,targetId){
+    el(targetId).innerHTML=`
+      <div class="success-box confetti-wrap" id="successBox">
+        <div class="check-circle"><svg viewBox="0 0 28 28"><path d="M5 14 L11 20 L23 8"/></svg></div>
+        <div class="success-text">
+          <h3>¡Expediente generado correctamente!</h3>
+          <p>Se crearon <strong>${numDocs} documentos PDF</strong> en <code>${escapeHtml(zipName)}</code>.<br>
+          Revisa tu carpeta de Descargas para verificar el contenido.</p>
+        </div>
+      </div>`;
+    this._spawnConfetti(el("successBox"));
+    el("rd4").className="rail-dot done";el("rd4").textContent="✓";
+  },
+
+  _spawnConfetti(c){
+    for(let i=0;i<28;i++){
+      const d=document.createElement("div");
+      d.className="confetti-dot";
+      d.style.left=Math.random()*100+"%";
+      d.style.background=CONFIG.CONFETTI_COLORS[Math.floor(Math.random()*CONFIG.CONFETTI_COLORS.length)];
+      d.style.width=(6+Math.random()*6)+"px";d.style.height=d.style.width;
+      d.style.animationDelay=Math.random()*.6+"s";d.style.animationDuration=(.9+Math.random()*.6)+"s";
+      c.appendChild(d);setTimeout(()=>d.remove(),1800);
+    }
+  },
+};
+
+/* ════════════════════════════════════════════════════
+   PreviewService — Renderizado de miniaturas con PDF.js
+   Renderiza la primera página de cada sección con mayor
+   calidad (escala 0.65) para facilitar la verificación visual.
+   ════════════════════════════════════════════════════ */
+const PreviewService=(()=>{
+  /** Instancia de PDF.js — cargada en paralelo con pdf-lib */
+  let _pdfJsDoc=null;
+  /** Caché de páginas ya renderizadas: pageNum → canvas (re-renders instantáneos) */
+  const _pageCache=new Map();
+  /** Token de generación — descarta renders asíncronos obsoletos si el grid se reconstruyó */
+  let _gen=0;
+  /** Firma del último grid renderizado — evita reconstruir si los rangos no cambiaron */
+  let _lastSig="";
+  /** Timer de debounce para cambios rápidos (+/− repetidos) */
+  let _debounce=null;
+
+  /** Firma de los rangos actuales: cambia si cambia cualquier doc, orden, página o etiqueta */
+  function _signature(ranges){
+    return ranges.map(d=>`${d.seq}|${d.nombre}|${d.label}|${d.start}|${d.end}`).join("¶");
+  }
+
+  /** Copia un canvas cacheado (un canvas solo puede vivir en un punto del DOM) */
+  function _cloneCanvas(src){
+    const c=document.createElement("canvas");
+    c.width=src.width;c.height=src.height;
+    c.getContext("2d").drawImage(src,0,0);
+    return c;
+  }
+
+  return{
+    /**
+     * Carga el PDF en PDF.js para renderizado de miniaturas.
+     * Incluye timeout para no bloquear si el CDN es inaccesible.
+     * Limpia el caché de páginas: es un PDF nuevo.
+     */
+    async load(bytes){
+      _pageCache.clear();_lastSig="";
+      try{
+        pdfjsLib.GlobalWorkerOptions.workerSrc=
+          "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        const loadP   =pdfjsLib.getDocument({data:bytes.slice()}).promise;
+        const timeoutP=new Promise((_,rej)=>setTimeout(()=>rej(new Error("PDF.js timeout")),10000));
+        _pdfJsDoc=await Promise.race([loadP,timeoutP]);
+      }catch(e){console.warn("PreviewService: PDF.js no disponible →",e.message);_pdfJsDoc=null}
+    },
+
+    /**
+     * NUEVO v1.8.6 — Re-render dinámico con debounce.
+     * Se llama en CADA cambio de configuración (condicionales, steppers,
+     * tipo de identificación, tipo de doc bancario). Si los rangos no
+     * cambiaron (ej. solo se tecleo el nombre del titular), no hace nada.
+     * El caché de páginas hace que el re-render sea casi instantáneo.
+     */
+    scheduleRender(){
+      if(AppState.pdfPages===0) return;
+      clearTimeout(_debounce);
+      _debounce=setTimeout(()=>{
+        const{ranges}=ComputedState.get();
+        if(_signature(ranges)===_lastSig) return; // nada cambió en los rangos
+        this.renderGrid();
+      },150);
+    },
+
+    /**
+     * Construye el grid de miniaturas con skeleton loading.
+     * FIX v1.8.4: el grid se construye COMPLETO antes de renderizar.
+     * NUEVO v1.8.6: el grid es DINÁMICO — se reconstruye en cada cambio
+     * de configuración para que cada miniatura muestre la página inicial
+     * REAL de su documento. Usa token de generación para descartar
+     * renders obsoletos y caché de páginas para re-renders instantáneos.
+     */
+    async renderGrid(){
+      const{ranges}=ComputedState.get();
+      const grid=el("previewGrid"),ph=el("previewPlaceholder");
+      if(!ranges.length) return;
+      ph.classList.add("hidden");
+      _lastSig=_signature(ranges);
+      const gen=++_gen; // invalida cualquier render asíncrono anterior
+
+      // Grid HTML — construido con TODOS los rangos antes de iniciar renders.
+      // Esto garantiza que la tarjeta N° (ranges.length) siempre existe en el DOM.
+      grid.innerHTML=ranges.map((d,i)=>{
+        const fueraDeRango=d.end>AppState.pdfPages;
+        return`
+        <div class="preview-card" id="prev_${i}" style="animation-delay:${i*.04}s${fueraDeRango?";outline:2px solid #DC2626;outline-offset:-2px":""}" data-doc-seq="${escapeHtml(d.seq)}">
+          <div class="preview-canvas-wrap" id="prevCanvas_${i}">
+            <div class="preview-skeleton"></div>
+          </div>
+          <div class="preview-info">
+            <span class="preview-seq" id="prevSeq_${i}">${escapeHtml(d.seq)}</span>
+            <div class="preview-name" id="prevName_${i}" title="${escapeHtml(d.label)}">${escapeHtml(d.label)}</div>
+            <div class="preview-range" id="prevRange_${i}">Págs. ${d.start}–${d.end} (${d.pg} hoja${d.pg>1?"s":""})${fueraDeRango?" ⚠️":""}</div>
+          </div>
+        </div>`}).join("");
+
+      if(!_pdfJsDoc){
+        ranges.forEach((_,i)=>{
+          const w=el("prevCanvas_"+i);
+          if(w) w.innerHTML=`<div style="text-align:center;padding:12px"><span style="font-size:40px;opacity:.3">📄</span><div style="font-size:9px;color:#9CA3AF;margin-top:4px">Vista previa no disponible</div></div>`;
+        });
+        const aviso=document.createElement("div");
+        aviso.style.cssText="grid-column:1/-1;padding:10px 14px;background:#FFFBEB;border:1px solid #FCD34D;border-radius:8px;font-size:12px;color:#78350F;margin-top:4px";
+        aviso.textContent="⚠️ PDF.js no se pudo cargar desde CDN — las miniaturas no están disponibles. El corte de documentos funciona con normalidad.";
+        grid.appendChild(aviso);
+        return;
+      }
+
+      // Renderizado paralelo de todas las miniaturas.
+      // Promise.allSettled garantiza que un timeout o error en UNA página
+      // no impida que las demás tarjetas se muestren (fix: miniatura 18 faltante).
+      await Promise.allSettled(ranges.map((d,i)=>this._renderPage(d.start,i,gen)));
+    },
+
+    /**
+     * Renderiza una sola página del PDF como miniatura.
+     * NUEVO v1.8.6:
+     *  - Caché por número de página → re-renders dinámicos instantáneos.
+     *  - Token de generación → si el grid se reconstruyó mientras esta
+     *    página renderizaba, el resultado se descarta (evita miniaturas
+     *    "fantasma" de una configuración anterior).
+     *  - Página fuera de rango → indicador claro en vez de error.
+     */
+    async _renderPage(pageNum,cardIndex,gen){
+      const wrap=el("prevCanvas_"+cardIndex);
+      if(!wrap||!_pdfJsDoc) return;
+
+      // Página fuera del PDF cargado (config pide más páginas de las que hay)
+      if(pageNum<1||pageNum>AppState.pdfPages){
+        wrap.innerHTML=`<div style="text-align:center;padding:14px">
+          <span style="font-size:38px;opacity:.45">🚫</span>
+          <div style="font-size:9px;color:#DC2626;margin-top:5px;font-weight:600">Pág. ${pageNum} fuera del PDF</div>
+        </div>`;
+        return;
+      }
+
+      // Caché: si la página ya se renderizó, usar copia inmediata
+      if(_pageCache.has(pageNum)){
+        if(gen!==_gen) return;
+        wrap.innerHTML="";
+        wrap.appendChild(_cloneCanvas(_pageCache.get(pageNum)));
+        return;
+      }
+
+      try{
+        const page    =await _pdfJsDoc.getPage(pageNum);
+        // Escala 0.65 → buena resolución sin uso excesivo de memoria
+        const viewport=page.getViewport({scale:0.65});
+        const canvas  =document.createElement("canvas");
+        canvas.width  =viewport.width;
+        canvas.height =viewport.height;
+
+        // Timeout de 15s — páginas con gráficos complejos (recibos a color,
+        // tablas densas, logos de alta resolución) pueden tardar más.
+        const renderTask=page.render({canvasContext:canvas.getContext("2d"),viewport});
+        const timeoutP  =new Promise((_,rej)=>
+          setTimeout(()=>{renderTask.cancel();rej(new Error("timeout"))},15000)
+        );
+        await Promise.race([renderTask.promise,timeoutP]);
+
+        // Guardar en caché aunque el grid haya cambiado — servirá al siguiente render
+        _pageCache.set(pageNum,canvas);
+
+        // Si el grid se reconstruyó mientras renderizábamos, NO tocar el DOM:
+        // la tarjeta con este índice ahora pertenece a otro documento.
+        if(gen!==_gen) return;
+        const wrapNow=el("prevCanvas_"+cardIndex);
+        if(!wrapNow) return;
+        wrapNow.innerHTML="";
+        wrapNow.appendChild(_cloneCanvas(canvas));
+
+      }catch(e){
+        if(gen!==_gen) return;
+        const esTO=e.message?.includes("timeout")||e.message?.includes("cancel");
+        const wrapNow=el("prevCanvas_"+cardIndex);
+        if(!wrapNow) return;
+        wrapNow.innerHTML=`<div style="text-align:center;padding:14px">
+          <span style="font-size:38px;opacity:.4">${esTO?"⏱️":"📄"}</span>
+          <div style="font-size:9px;color:#9CA3AF;margin-top:5px">${esTO?"Tiempo agotado":"Sin vista previa"}</div>
+        </div>`;
+      }
+    },
+  };
+})();
+
+/* ════════════════════════════════════════════════════
+   PDFService — Carga, corte y descarga de PDFs
+   ════════════════════════════════════════════════════ */
+const PDFService={
+
+  /**
+   * Carga el PDF escaneado.
+   * pdf-lib se carga primero (crítico). PDF.js se carga en
+   * background con timeout para no bloquear si el CDN falla.
+   */
+  async loadSingle(event){
+    const archivo=event.target?.files?.[0];
+    if(!archivo) return;
+    const dz=el("dropZone");
+    dz.innerHTML=`<div class="upload-icon"><span class="spin" style="display:inline-block;width:32px;height:32px;border-width:3px;border-color:rgba(109,15,42,.2);border-top-color:var(--primary)"></span></div><h3>Cargando...</h3><p>${escapeHtml(archivo.name)}</p>`;
+    try{
+      const ab=await archivo.arrayBuffer();
+      AppState.pdfBytes=new Uint8Array(ab);
+      // Cargar pdf-lib primero (crítico)
+      AppState.pdfDoc  =await PDFLib.PDFDocument.load(AppState.pdfBytes);
+      AppState.pdfPages=AppState.pdfDoc.getPageCount();
+
+      dz.className="upload-zone loaded";
+      dz.innerHTML=`<div class="upload-icon">✅</div><h3>${escapeHtml(archivo.name)}</h3><p>${AppState.pdfPages} páginas cargadas correctamente</p>`;
+      el("pagesRow").classList.remove("hidden");
+      UI.updatePagesStatus();UI.updateTable();UI.updateRail();UI.updateLocks();UI.updateButton();
+
+      // Cargar PDF.js en background con timeout — no bloquea el flujo principal
+      const pdfJsP  =PreviewService.load(AppState.pdfBytes);
+      const timeoutP=new Promise(r=>setTimeout(r,10000));
+      await Promise.race([pdfJsP,timeoutP]);
+      await PreviewService.renderGrid();
+
+      smoothScroll(AppState.pdfPages===ComputedState.get().total?"card4":"card3");
+    }catch(e){
+      dz.innerHTML=`<input type="file" id="pdfInput" accept=".pdf" onchange="PDFService.loadSingle(event)"/><div class="upload-icon">❌</div><h3>Error al leer el PDF</h3><p>${escapeHtml(e.message)}</p>`;
+      el("pagesAlert").innerHTML=`<div class="alert err"><span class="alert-icon">❌</span>${escapeHtml(e.message)}</div>`;
+    }
+  },
+
+  /**
+   * Corta el PDF en documentos individuales y los descarga como ZIP.
+   * Usa el PDFDocument cacheado (sin re-parseo) y Promise.all (paralelo).
+   */
+  async cut(event){
+    if(event) addRipple(el("btnCut"),event);
+    const btn=el("btnCut"),pb=el("progressBar"),pl=el("progressLabel"),res=el("cutResult");
+    btn.disabled=true;btn.innerHTML=`<span class="spin"></span><span>Procesando...</span>`;
+    el("progressWrap").classList.remove("hidden");pl.classList.remove("hidden");
+    pb.style.width="0%";res.innerHTML="";
+    try{
+      const{ranges}=ComputedState.get();
+      const sfx=Identifier.build()?`_${Identifier.build()}`:"";
+      pl.textContent=`Creando ${ranges.length} documentos en paralelo...`;
+
+      const docs=await Promise.all(ranges.map(async d=>{
+        const nd=await PDFLib.PDFDocument.create();
+        const idx=Array.from({length:d.end-d.start+1},(_,i)=>d.start-1+i);
+        const pgs=await nd.copyPages(AppState.pdfDoc,idx);
+        pgs.forEach(p=>nd.addPage(p));
+        return{nombre:`${d.seq}_${d.nombre}${sfx}.pdf`,bytes:await nd.save()};
+      }));
+
+      pb.style.width="85%";pl.textContent="Empaquetando ZIP...";
+      const zip=new JSZip();
+      docs.forEach(({nombre,bytes})=>zip.file(nombre,bytes));
+      const blob=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
+      pb.style.width="100%";pl.textContent="¡Completado!";
+
+      const zipName=`Expediente${sfx}.zip`;
+      const url=URL.createObjectURL(blob);
+      const a=Object.assign(document.createElement("a"),{href:url,download:zipName});
+      document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);
+      UI.showSuccess(docs.length,zipName,"cutResult");
+    }catch(e){
+      res.innerHTML=`<div class="alert err"><span class="alert-icon">❌</span>Error: ${escapeHtml(e.message)}</div>`;
+      el("progressWrap").classList.add("hidden");pl.classList.add("hidden");
+    }finally{
+      btn.innerHTML=`<span>✂️</span><span>Cortar y Descargar ZIP</span>`;
+      btn.disabled=AppState.pdfPages===0||AppState.pdfPages!==ComputedState.get().total;
+    }
+  },
+};
+
+/* ════════════════════════════════════════════════════
+   App — Orquestador principal
+   ════════════════════════════════════════════════════ */
+const App={
+  /**
+   * Ciclo principal de actualización.
+   * Lee el formulario, invalida caché y refresca toda la UI.
+   */
+  onUpdate(){
+    AppState.numCredito=el("numCredito").value.trim();
+    AppState.nombreDH  =el("nombreDH"  ).value.trim();
+    ComputedState.invalidate();
+    UI.updateTotalEsperado();
+    if(AppState.pdfPages>0) UI.updatePagesStatus();
+    UI.updateTable();UI.updateRail();UI.updateLocks();UI.updateButton();
+    // v1.8.6 — Miniaturas DINÁMICAS: cualquier cambio de configuración
+    // (condicionales, páginas variables, tipo de ID, tipo de doc bancario)
+    // reconstruye el grid con las páginas correctas. Si solo cambió el
+    // nombre/N° de crédito, la firma de rangos no cambia y no se re-renderiza.
+    PreviewService.scheduleRender();
+  },
+
+  /** Inicializa drag & drop y primer renderizado */
+  init(){
+    const dz=el("dropZone");
+    if(dz){
+      dz.addEventListener("dragover", e=>{e.preventDefault();dz.classList.add("drag")});
+      dz.addEventListener("dragleave",()=>dz.classList.remove("drag"));
+      dz.addEventListener("drop",e=>{
+        e.preventDefault();dz.classList.remove("drag");
+        const f=e.dataTransfer.files[0];
+        if(f?.type==="application/pdf") PDFService.loadSingle({target:{files:[f]}});
+      });
+    }
+    this.onUpdate();
+  },
+};
+
+document.addEventListener("DOMContentLoaded",()=>App.init());
+</script>
+</body>
+</html>
